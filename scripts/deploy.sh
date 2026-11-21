@@ -13,8 +13,12 @@ echo "== 1/5 检查 Node.js =="
 if ! command -v node >/dev/null 2>&1 || [ "$(node -v | sed 's/v\([0-9]*\).*/\1/')" -lt 18 ]; then
   echo "没有 Node.js 18+，开始安装…"
   if command -v apt-get >/dev/null 2>&1; then
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt-get update -y >/dev/null 2>&1 || true
     sudo apt-get install -y nodejs git
+    if ! command -v node >/dev/null 2>&1 || [ "$(node -v | sed 's/v\([0-9]*\).*/\1/')" -lt 18 ]; then
+      curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+      sudo apt-get install -y nodejs
+    fi
   else
     curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
     sudo yum install -y nodejs git
@@ -33,13 +37,24 @@ echo "== 3/5 配置大模型 =="
 if [ -f "$APP_DIR/.env" ] && grep -q LLM_API_KEY "$APP_DIR/.env"; then
   echo "已有 .env，跳过（要换 Key 就删掉 $APP_DIR/.env 再运行本脚本）"
 else
-  read -r -s -p "请粘贴 API Key（不显示，粘贴后回车）: " KEY < /dev/tty
-  echo
-  read -r -p "用哪个模型？1=GPT（海外服务器） 2=智谱 GLM（国内服务器）[1]: " CHOICE < /dev/tty
-  if [ "$CHOICE" = "2" ]; then
-    BASE="https://open.bigmodel.cn/api/paas/v4"; MODEL="glm-4-flash"
-  else
-    BASE="https://api.openai.com/v1"; MODEL="gpt-4o-mini"
+  echo "用哪个大模型？"
+  echo "  1 = 阿里云百炼（国内站，通义千问）"
+  echo "  2 = 阿里云百炼（国际站）"
+  echo "  3 = GPT（服务器必须在海外且不是香港/大陆）"
+  echo "  4 = 智谱 GLM（国内）"
+  echo "  5 = 先不接 AI（用规则兜底，之后再配）"
+  read -r -p "请输入数字 [1]: " CHOICE < /dev/tty
+  KEY=""
+  case "$CHOICE" in
+    2) BASE="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"; MODEL="qwen-plus" ;;
+    3) BASE="https://api.openai.com/v1"; MODEL="gpt-4o-mini" ;;
+    4) BASE="https://open.bigmodel.cn/api/paas/v4"; MODEL="glm-4-flash" ;;
+    5) BASE="https://dashscope.aliyuncs.com/compatible-mode/v1"; MODEL="qwen-plus" ;;
+    *) BASE="https://dashscope.aliyuncs.com/compatible-mode/v1"; MODEL="qwen-plus" ;;
+  esac
+  if [ "$CHOICE" != "5" ]; then
+    read -r -s -p "请粘贴 API Key（不显示，粘贴后回车）: " KEY < /dev/tty
+    echo
   fi
   umask 077
   cat > "$APP_DIR/.env" <<EOF
