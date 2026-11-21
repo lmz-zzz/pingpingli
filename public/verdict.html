@@ -7,70 +7,70 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<!-- 页面 4：判决书（也是判例广场点进来的详情页）
-     后端：case.verdict = { ratio:{A,B,C}, text, highlights[] }，由 AI 根据卷宗 + 7 票生成 -->
+<!-- 页面：判决书 + 寝室公约（也是广场里已判决案子的详情页）
+     后端：case.verdict = { result:{A,MID,B}, text（AI）, pact:[...]（AI） }；POST /api/cases/:id/reconcile 双方确认握手言和 -->
 <header class="topbar"><div class="inner">
-  <a class="logo" href="index.html">评评<span>理</span></a>
+  <a class="logo" href="index.html">评评<span>理</span> 🍉</a>
   <nav class="nav">
-    <a href="index.html">判例广场</a>
-    <a href="file.html">我要立案</a>
-    <a href="hall.html">陪审大厅</a>
-    <a class="on" href="me.html">我的</a>
+    <a class="on" href="index.html">吃瓜广场</a>
+    <a href="file.html">我要评理</a>
+    <a href="hall.html">陪审员中心</a>
+    <a href="me.html">我的</a>
   </nav>
 </div></header>
 
 <main class="page">
-  <div class="steps"><div class="done">立案</div><div class="done">应诉</div><div class="done">卷宗</div><div class="done">陪审</div><div class="on">判决</div></div>
-
+  <div class="steps"><div class="done">立案</div><div class="done">室友应诉</div><div class="done">大家评理</div><div class="on">判决</div></div>
   <div class="grid2">
     <section>
-      <div class="card">
-        <h2>建议贡献比例</h2>
-        <div class="ratio" data-bind="ratio" style="height:40px;font-size:14px">
-          <span class="A" style="width:42%">A 42%</span><span class="B" style="width:40%">B 40%</span><span class="C" style="width:18%">C 18%</span>
-        </div>
-        <p class="hint">综合 7 位陪审员的投票（中位数）和卷宗证据得出。</p>
-        <div class="row" style="margin-top:8px">
-          <a class="btn primary" href="#">复制比例，填老师的表</a>
-          <a class="btn" href="#">生成分享图</a>
-        </div>
+      <div class="card" data-bind="result">
+        <h2>陪审团意见 · 12 票</h2>
+        <div class="ratio" style="height:40px;font-size:14px"><span class="A" style="width:24%">支持 A 24%</span><span class="mid" style="width:61%">各退一步 61%</span><span class="B" style="width:15%">B 15%</span></div>
       </div>
-
       <article class="card verdict" data-bind="verdict-text">
-        <h1>民 事 判 决 书</h1>
-        <p class="no">（2026）评字第 0042 号 · 传播学概论期中展示贡献纠纷案</p>
-        <p>原告 A 诉称，其与 B 承担了本组大部分工作，不愿与 C 平分贡献。被告 C 辩称，自己“一直在弄”。</p>
-        <p>本院查明：C 于 11 月 2 日主动认领 PPT，此后七日内于群聊中无一言、于文档中无一改，经 A 两次 @ 催促，方于展示前夜凌晨一点四十七分现身，自述“在调字体”。本院认为，调整字体确属 PPT 制作之组成部分，但以三日之功仅成三处修改，难谓尽职。</p>
-        <p>另查明，B 全程未被催促，按时交付图表四张，本院予以表扬。</p>
-        <p>综上，参考陪审团七人之意见，判决如下：本组贡献比例建议为 A 42%、B 40%、C 18%。C 同学下次认领任务时，请先确认自己知道 PPT 在哪。</p>
-        <p>如不服本判决，可于三日内提出上诉。</p>
+        <h1>判 决 书</h1>
+        <p class="no">（2026）评字第 0042 号 · 空调温度案</p>
+        <p>本院查明：室友 A 怕热，室友 B 怕冷，二人围绕遥控器展开了长达两周的“无声拉锯”，期间空调温度在 24°C 与 27°C 之间反复横跳，所幸双方均未开口吵架，本院予以表扬。</p>
+        <p>本院认为：怕热不是错，怕冷也不是错，错的是遥控器只有一个。六成吃瓜群众主张各退一步，本院采纳。</p>
+        <p>判决如下：夜间空调定为 26°C 并开启睡眠模式；A 自备小风扇一台，B 获赠小毯子一条，费用由 A 承担，以示诚意。</p>
+        <p>愿二位从此一觉到天亮。</p>
         <div class="seal"><b>评评理<br>AI 法庭</b></div>
       </article>
     </section>
-
     <aside>
-      <div class="card" data-bind="jury-comments">
-        <h3>陪审团意见</h3>
-        <p class="quote">5 号：调字体也算工作量，但调三天就不算了。</p>
-        <p class="quote">2 号：A 发起分工还写综述，多给一点。</p>
-        <p class="quote">7 号：C 至少做了，别给太低。</p>
-        <a class="muted" href="#">查看全部 7 条 →</a>
+      <div class="card pact" data-bind="pact">
+        <h3>📜 寝室公约（AI 起草）</h3>
+        <ol><li>工作日夜间 26°C，开睡眠模式</li><li>周末轮流定温度，这周 A，下周 B</li><li>谁先感冒，谁有一次否决权</li></ol>
+        <a class="btn block" style="margin-top:10px" href="#">保存公约图片</a>
+      </div>
+      <div class="card" data-bind="reconcile">
+        <h3>握手言和</h3>
+        <div class="stat"><span><span class="who A">A</span> 已确认</span><span>🤝</span></div>
+        <div class="stat"><span><span class="who B">B</span> 等待确认</span><span>⏳</span></div>
+        <a class="btn primary block" style="margin-top:8px" href="#">我接受，握手言和</a>
+      </div>
+      <div class="card" data-bind="juror-review">
+        <h3>🏅 AI 陪审员点评</h3>
+        <p class="muted">AI 按“讲理、有建设性、友善”给每位陪审员的意见打分，计入陪审信用。</p>
+        <div class="stat"><span><b>最佳陪审员 · 3 号</b><br><span class="muted">“建议 A 睡靠空调那边”被写进公约</span></span><span class="badge green">+5</span></div>
+        <div class="stat"><span>7 号<br><span class="muted">理由充分，给了两个办法</span></span><span class="badge green">+3</span></div>
+        <div class="stat"><span>11 号<br><span class="muted">只说了“A 太矫情”，没讲理由</span></span><span class="badge red">-2</span></div>
       </div>
       <div class="card">
-        <h3>接下来</h3>
-        <a class="btn block" href="#" style="margin-bottom:8px">公开到判例广场（需双方同意）</a>
-        <a class="btn block" href="#">不服，上诉</a>
+        <a class="btn block" href="#" style="margin-bottom:8px">生成分享图</a>
+        <a class="btn block" href="#">还是不服，上诉</a>
       </div>
     </aside>
   </div>
 </main>
 
 <nav class="tabbar">
-  <a href="index.html"><b>🏛</b>广场</a>
+  <a class="on" href="index.html"><b>🍉</b>广场</a>
   <a href="file.html"><b>📝</b>立案</a>
   <a href="hall.html"><b>⚖️</b>陪审</a>
-  <a class="on" href="me.html"><b>📂</b>我的</a>
+  <a href="me.html"><b>🏠</b>我的</a>
 </nav>
+
 <script src="app.js"></script>
 </body>
 </html>

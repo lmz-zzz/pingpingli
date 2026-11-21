@@ -12,11 +12,7 @@ if (!src) {
 }
 const dest = path.join(__dirname, '..', 'public');
 const SKIP = /功能一览|README|\.md$|\.zip$/;
-const EXTRA_CSS = `
-/* 第 4、5 位组员（后端加的，视觉可以改颜色） */
-:root { --d: #8a5cd1; --e: #c2477f; }
-.who.D, .ratio .D { background: var(--d); } .who.E, .ratio .E { background: var(--e); }
-`;
+
 
 function copyDir(from, to) {
   fs.mkdirSync(to, { recursive: true });
@@ -30,9 +26,7 @@ function copyDir(from, to) {
       if (!html.includes('src="app.js"')) html = html.replace('</body>', '<script src="app.js"></script>\n</body>');
       fs.writeFileSync(b, html);
     } else if (name === 'style.css') {
-      let css = fs.readFileSync(a, 'utf8');
-      if (!css.includes('--d:')) css += EXTRA_CSS;
-      fs.writeFileSync(b, css);
+      fs.copyFileSync(a, b);
     } else {
       fs.copyFileSync(a, b);
     }

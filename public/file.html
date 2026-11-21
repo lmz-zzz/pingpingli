@@ -3,88 +3,73 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>评评理 · 立案</title>
+<title>评评理 · 我要评理</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<!-- 页面 1：立案 + 应诉
-     后端：表单提交到 POST /api/cases，返回案件 id；“应诉状态”区块读 case.members[].agreed -->
+<!-- 页面：立案 + 室友应诉
+     后端：POST /api/cases {category, title, claimA, chat}，返回 id；应诉状态读 case.respondent.agreed / case.claimB -->
 <header class="topbar"><div class="inner">
-  <a class="logo" href="index.html">评评<span>理</span></a>
+  <a class="logo" href="index.html">评评<span>理</span> 🍉</a>
   <nav class="nav">
-    <a href="index.html">判例广场</a>
-    <a class="on" href="file.html">我要立案</a>
-    <a href="hall.html">陪审大厅</a>
+    <a href="index.html">吃瓜广场</a>
+    <a class="on" href="file.html">我要评理</a>
+    <a href="hall.html">陪审员中心</a>
     <a href="me.html">我的</a>
   </nav>
 </div></header>
 
 <main class="page">
-  <div class="steps"><div class="on">立案</div><div>应诉</div><div>卷宗</div><div>陪审</div><div>判决</div></div>
-
+  <div class="steps"><div class="on">立案</div><div>室友应诉</div><div>大家评理</div><div>判决</div></div>
   <div class="grid2">
-    <form class="card" id="case-form" action="dossier.html">
-      <h1>立案</h1>
-      <p class="muted">作业交完了、要填贡献比例了？把证据交给书记员。</p>
-
-      <label>课程</label>
-      <input type="text" name="course" value="传播学概论">
-      <label>作业</label>
-      <input type="text" name="assignment" value="期中小组展示：短视频平台的算法推荐">
-
-      <label>组员</label>
-      <div class="row" style="margin-bottom:6px"><span class="who A">A</span><input type="text" name="m_A" value="我（原告）" style="flex:1"></div>
-      <div class="row" style="margin-bottom:6px"><span class="who B">B</span><input type="text" name="m_B" placeholder="组员昵称" value="小周" style="flex:1"></div>
-      <div class="row" style="margin-bottom:6px"><span class="who C">C</span><input type="text" name="m_C" placeholder="组员昵称" value="阿凯" style="flex:1"></div>
-      <a href="#" class="muted">＋ 添加组员</a>
-      <p class="hint">真名只用于邀请应诉，卷宗里一律显示为 A / B / C。</p>
-
-      <label>群聊记录</label>
-      <textarea name="chat" placeholder="把微信群聊天记录复制粘贴到这里">[11-02 21:14] A：大家分一下工吧，我做文献综述
-[11-02 21:20] B：我来做数据和图表
-[11-02 23:05] C：我做 PPT！
-[11-06 22:31] A：@C PPT 有进度了吗
-[11-08 20:12] A：@C 在吗，周一就要讲了
-[11-09 01:47] C：在弄了在弄了，在调字体</textarea>
-      <p class="hint">支持微信“导出聊天记录”的文本，或直接复制。</p>
-
-      <label>共享文档修改记录（可选）</label>
-      <textarea name="doc_log" style="min-height:80px" placeholder="腾讯文档 / 飞书的“查看修改记录”复制过来">11-05 A 编辑了 32 处
-11-07 B 编辑了 18 处，插入 4 张图表
-11-09 C 编辑了 3 处</textarea>
-
-      <label>分工表（可选）</label>
-      <div class="upload">点击上传图片或表格 · 也可以跳过</div>
-
-      <label>你的诉求</label>
-      <textarea name="claim" style="min-height:70px">我觉得自己和 B 做了大部分工作，不想和 C 平分。</textarea>
-
-      <button class="btn primary block" style="margin-top:16px" type="submit">提交立案，邀请组员应诉</button>
+    <form class="card" id="case-form" action="case.html">
+      <h1>我要评理</h1>
+      <p class="muted">和室友有点小分歧？写下来，让大家帮你们看看。</p>
+      <label>是关于什么的</label>
+      <div class="chips">
+        <label><input type="radio" name="category" value="空调" checked>空调</label>
+        <label><input type="radio" name="category" value="作息">作息</label>
+        <label><input type="radio" name="category" value="卫生">卫生</label>
+        <label><input type="radio" name="category" value="外卖">外卖</label>
+        <label><input type="radio" name="category" value="借东西">借东西</label>
+        <label><input type="radio" name="category" value="其他">其他</label>
+      </div>
+      <label>一句话标题</label>
+      <input type="text" name="title" value="空调该开 22°C 还是 28°C？">
+      <label>我的说法</label>
+      <textarea name="claimA">我特别怕热，晚上 28°C 根本睡不着，第二天早八起不来。我想开 22°C。</textarea>
+      <label>寝室群聊天记录（可选）</label>
+      <textarea name="chat" style="min-height:90px" placeholder="直接复制粘贴寝室群的聊天">[22:41] A：今晚能开低一点吗，热得睡不着
+[22:43] B：我已经盖了两床被子了……
+[23:10] A：（默默调到 24）
+[23:12] B：（默默调回 27）</textarea>
+      <p class="hint">真名、宿舍号会自动隐去，你们俩在案子里叫“室友 A”和“室友 B”。</p>
+      <button class="btn primary block" style="margin-top:16px" type="submit">生成邀请链接，发给室友</button>
     </form>
-
     <aside>
       <div class="card" data-bind="respond-status">
-        <h3>应诉状态</h3>
-        <p class="muted">双方都同意，才会开庭。</p>
-        <div class="stat"><span><span class="who B">B</span> 小周</span><span>✅ 已同意</span></div>
-        <div class="stat"><span><span class="who C">C</span> 阿凯</span><span>⏳ 等待中</span></div>
-        <p class="demo-note">演示用：<a href="dossier.html"><u>模拟组员全部同意 → 开庭</u></a></p>
+        <h3>室友应诉</h3>
+        <p class="muted">室友同意了才会开庭，Ta 也会写下自己的说法。</p>
+        <div class="stat"><span><span class="who B">B</span> 室友 B</span><span>✅ 已同意</span></div>
+        <p class="quote" data-bind="claimB">“我怕冷，22°C 我得盖两床被子，上个月还感冒了一次。”</p>
+        <p class="demo-note">演示用：<a href="case.html"><u>模拟室友同意 → 开庭</u></a></p>
       </div>
       <div class="card">
-        <h3>被邀请应诉的人会看到</h3>
-        <p class="muted">“你的组员 A 申请为《期中小组展示》评评理。你可以补充自己的说法和证据，卷宗不会出现真名。”</p>
-        <a class="btn" href="#">同意并补充我的说法</a>
+        <h3>室友收到的邀请</h3>
+        <p class="muted">“你的室友想请大家评评‘空调该开几度’。不是告状，是一起找个办法。你愿意写下你的说法吗？”</p>
+        <a class="btn" href="#">愿意，写我的说法</a>
       </div>
     </aside>
   </div>
 </main>
 
 <nav class="tabbar">
-  <a href="index.html"><b>🏛</b>广场</a>
+  <a href="index.html"><b>🍉</b>广场</a>
   <a class="on" href="file.html"><b>📝</b>立案</a>
   <a href="hall.html"><b>⚖️</b>陪审</a>
-  <a href="me.html"><b>📂</b>我的</a>
+  <a href="me.html"><b>🏠</b>我的</a>
 </nav>
+
 <script src="app.js"></script>
 </body>
 </html>

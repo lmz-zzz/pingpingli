@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>评评理 · 案件详情</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- 页面：案件详情 + 吃瓜陪审（主角页）
+     后端：GET /api/cases/:id 返回 { summary（AI）, focus（AI）, claimA, claimB, votes, comments }
+           POST /api/cases/:id/votes { choice: "A"|"MID"|"B", comment } -->
+<header class="topbar"><div class="inner">
+  <a class="logo" href="index.html">评评<span>理</span> 🍉</a>
+  <nav class="nav">
+    <a class="on" href="index.html">吃瓜广场</a>
+    <a href="file.html">我要评理</a>
+    <a href="hall.html">陪审员中心</a>
+    <a href="me.html">我的</a>
+  </nav>
+</div></header>
+
+<main class="page">
+  <div class="steps"><div class="done">立案</div><div class="done">室友应诉</div><div class="on">大家评理</div><div>判决</div></div>
+  <section class="card" style="background:var(--accent-soft);border-color:#f3c3aa">
+    <div class="row"><span class="tag">空调</span><span class="tag">评字第 0042 号</span><span class="spacer"></span><span class="muted" data-bind="watchers">🍉 236 人吃瓜</span></div>
+    <h1 style="margin-top:8px" data-bind="title">空调该开 22°C 还是 28°C？</h1>
+    <h3>AI 书记员 · 案情速览</h3>
+    <p data-bind="summary">A 怕热，B 怕冷。两人已经围绕遥控器“暗中较量”了两周：A 调到 24，B 默默调回 27，谁也没说破。两人都不想吵架，只是想睡个好觉。</p>
+    <p><b>争议焦点：</b><span data-bind="focus">夜里空调温度，谁说了算？</span></p>
+  </section>
+
+  <div class="side" style="margin-bottom:16px">
+    <div class="card"><div class="row"><span class="who A">A</span><b>我想开 22°C</b></div><p class="quote" data-bind="claimA">我特别怕热，晚上 28°C 根本睡不着，第二天早八起不来。</p></div>
+    <div class="card"><div class="row"><span class="who B">B</span><b>我想开 28°C</b></div><p class="quote" data-bind="claimB">我怕冷，22°C 我得盖两床被子，上个月还感冒了一次。</p></div>
+  </div>
+
+  <div class="grid2">
+    <section>
+    <form class="card" id="apply-form" data-bind="apply">
+      <div class="row"><h2 style="margin:0">想当本案陪审员？</h2><span class="spacer"></span><span class="badge blue" data-bind="seats">陪审席 9 / 12</span></div>
+      <p class="muted">围观谁都可以，投票只交给 12 位陪审员。由 AI 根据以往的陪审表现，从报名者和高信用用户里挑选。</p>
+      <label>为什么想当这个案子的陪审员？</label>
+      <input type="text" name="reason" value="我也是怕冷的那个，但我室友怕热，我们已经磨合出办法了">
+      <label class="check"><input type="checkbox" name="pledge" checked><span>我承诺：读完双方说法再投票，只评事不评人，给出客观、有建设性的意见</span></label>
+      <button class="btn block" type="submit">报名陪审</button>
+      <p class="hint">报名后 AI 会参考你的陪审信用和报名理由决定是否入选，结果推送给你。</p>
+    </form>
+    <form class="card" id="vote-form" action="verdict.html">
+      <span class="tag">你是本案第 10 号陪审员</span>
+      <h2 style="margin-top:8px">你怎么看？</h2>
+      <div class="choice">
+        <label><input type="radio" name="choice" value="A"><span>支持 A</span></label>
+        <label><input type="radio" name="choice" value="MID" checked><span>各退一步</span></label>
+        <label><input type="radio" name="choice" value="B"><span>支持 B</span></label>
+      </div>
+      <label>一句评语（最好带个办法）</label>
+      <input type="text" name="comment" value="26°C + 给 B 买条小毯子，完美">
+      <button class="btn primary block" style="margin-top:12px" type="submit">投出我的一票</button>
+      <p class="demo-note">演示用：已预置 9 位陪审员的票和意见，现场投第 10 票，然后点“生成判决”。<a href="verdict.html"><u>生成判决 →</u></a></p>
+    </form>
+    </section>
+    <aside>
+      <div class="card" data-bind="vote-result">
+        <h3>陪审团投票 · 9 / 12</h3>
+        <div class="jurors" style="margin:8px 0"><span class="voted">1</span><span class="voted">2</span><span class="voted">3</span><span class="voted">4</span><span class="voted">5</span><span class="voted">6</span><span class="voted">7</span><span class="voted">8</span><span class="voted">9</span><span>10</span><span>11</span><span>12</span></div>
+        <div class="ratio" style="margin:8px 0"><span class="A" style="width:22%">A 22%</span><span class="mid" style="width:56%">各退一步 56%</span><span class="B" style="width:22%">B</span></div>
+        <p class="muted">12 票到齐或 24 小时后，AI 法官开始写判决。</p>
+      </div>
+      <div class="card" data-bind="comments">
+        <h3>🔥 陪审员意见 <span class="muted">（围观群众可以点赞）</span></h3>
+        <p class="quote">建议 A 睡靠空调那边，B 睡离空调远的那边。<span class="muted">👍 88</span></p>
+        <p class="quote">睡眠模式了解一下，后半夜自动升温。<span class="muted">👍 61</span></p>
+        <p class="quote">A 买个小风扇，B 买条电热毯，各自解决各自的。<span class="muted">👍 40</span></p>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<nav class="tabbar">
+  <a class="on" href="index.html"><b>🍉</b>广场</a>
+  <a href="file.html"><b>📝</b>立案</a>
+  <a href="hall.html"><b>⚖️</b>陪审</a>
+  <a href="me.html"><b>🏠</b>我的</a>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>

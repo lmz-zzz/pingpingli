@@ -1,48 +1,58 @@
-# 评评理
+# 评评理 🍉
 
-小组作业交完了，谁干了多少活？AI 帮你把证据理清楚，7 位陌生同学帮你评个公道。
+室友之间的小事，来让大家评评理。不是吵架，是让大家帮忙看看；AI 法官写判决，最后给你们一份寝室公约。
 
 人大第二届「造物有心」黑客松 ·「我的校园我来建」赛道作品。
 
 ## 流程
 
-判例广场 → 立案（粘贴群聊、文档修改记录）→ 组员同意应诉 → **AI 书记员生成贡献卷宗** → 7 位陪审员拖滑块分比例 → **AI 法官写判决书**（比例取 7 票中位数）→ 复制比例填老师的表 / 公开到判例广场
+1. **立案**：室友 A 选案由、写标题和自己的说法（可粘贴寝室群聊天），生成邀请链接发给室友。
+2. **室友应诉**：室友 B 写下自己的说法，同意后开庭。AI 书记员整理「案情速览 + 争议焦点」。
+3. **招募陪审团**：每案 12 个席位。同学报名（写理由并做「客观承诺」），或由系统根据**陪审信用**推送邀请；**AI 遴选**出最合适的人。围观谁都可以，投票只限陪审员。
+4. **陪审投票**：支持 A / 各退一步 / 支持 B，附一句评语。围观群众只能给评语点赞。
+5. **AI 判决**：AI 法官结合票数和高赞评语，写一份好笑又温暖的判决书 + 3 条寝室公约。
+6. **握手言和**：双方确认后，案子在广场标为「已握手言和」。
+7. **AI 点评陪审员**：按「讲理、有建设性、友善」给每位陪审员的意见打分，选出最佳陪审员，计入陪审信用，下次遴选时参考。
+
+## 四处真接 AI
+
+| 环节 | 作用 |
+|---|---|
+| 书记员 | 整理案情速览和争议焦点 |
+| 遴选官 | 根据报名理由和陪审信用，挑出陪审团 |
+| 法官 | 写判决书和寝室公约 |
+| 评价官 | 点评每位陪审员，更新陪审信用 |
+
+每处都有规则兜底：AI 没连上时演示不会断。
 
 ## 技术
 
-- 后端：Node.js（零依赖，只用自带模块），`server.js`
+- 后端：Node.js（零依赖，只用自带模块），`server.js`；AI 提示词在 `lib/ai.js`，预置演示数据在 `lib/seed.js`
 - 前端：原生 HTML + CSS + JS，`public/`，手机和电脑自适应
-- 大模型：智谱 GLM-4-Flash（兼容 OpenAI 接口，换 DeepSeek 等只需改环境变量）
+- 大模型：任何兼容 OpenAI 接口的服务（GPT、通义千问/百炼、智谱、DeepSeek……），只改环境变量
 - 存储：一个 JSON 文件，一个案子一条记录
-- 隐私：真名在立案时就被替换成 A/B/C，之后发给 AI、存储、展示的都只有代号
-- 兜底：AI 没连上时，用规则统计生成卷宗、用模板生成判决书，演示不会断
+- 隐私：案子里双方一律是「室友 A / 室友 B」；陪审员只显示席位号；寝室群聊原文不返回给前端
 
-## 本地运行
+## 运行
 
 ```bash
-LLM_API_KEY=你的key node server.js
+LLM_API_KEY=你的key LLM_BASE_URL=https://api.openai.com/v1 LLM_MODEL=gpt-4o-mini node server.js
 # 打开 http://localhost:3000
 ```
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
 | `LLM_API_KEY` | 无 | 大模型 API Key，不填则走规则兜底 |
-| `LLM_BASE_URL` | `https://open.bigmodel.cn/api/paas/v4` | 换 DeepSeek：`https://api.deepseek.com` |
-| `LLM_MODEL` | `glm-4-flash` | 换 DeepSeek：`deepseek-chat` |
+| `LLM_BASE_URL` | `https://open.bigmodel.cn/api/paas/v4` | GPT：`https://api.openai.com/v1`；百炼：`https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| `LLM_MODEL` | `glm-4-flash` | GPT：`gpt-4o-mini`；百炼：`qwen-plus` |
 | `PORT` | `3000` | 部署平台一般会自动设置 |
+| `DEMO_MODE` | 开 | 演示捷径（模拟室友同意、验证码直接显示等）；正式运营设为 `off` |
 
-## 接口
+服务器一键部署：`curl -fsSL https://raw.githubusercontent.com/lmz-zzz/pingpingli/main/scripts/deploy.sh | bash -s -- 8080`
 
-| 方法 | 路径 | 作用 |
-|---|---|---|
-| GET | `/api/feed` | 判例广场列表 + 一个待陪审的案子 |
-| POST | `/api/cases` | 立案 `{course, assignment, members[], chat, doc_log, claim}` |
-| GET | `/api/cases/:id` | 读案子（不含真名和原始群聊） |
-| POST | `/api/cases/:id/agree` | 组员同意应诉；全部同意后 AI 生成卷宗 |
-| POST | `/api/cases/:id/votes` | 陪审投票 `{ratio:{A,B,C}, comment}`；第 7 票后 AI 写判决书 |
-| POST | `/api/cases/:id/publish` | 公开到判例广场 |
+## 演示数据
 
-演示案 `demo` 已预置卷宗和 6 票，现场投第 7 票即出判决；每次投票都会复制出一个新案子，`demo` 本身永远停在 6 票，可以反复演示。
+启动时会预置 6 个案子：《空调该开 22°C 还是 28°C？》（9/12 席位，现场报名→AI 遴选→投第 10 票→生成判决）、两个招募中的案子、两个已握手言和的判例、一个等室友应诉的邀请。演示模式下对预置案例的操作都落在复制品上，预置案例永远保持原样，可以反复录屏。
 
 ## AI 辅助说明
 

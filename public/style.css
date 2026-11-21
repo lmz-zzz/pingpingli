@@ -1,16 +1,17 @@
 /* 评评理 · 线框样式
    视觉同学：颜色、字体、圆角都在 :root 里改，结构和 data-bind 属性请保留（后端要往里填数据）。 */
 :root {
-  --bg: #f6f5f2;
+  --bg: #f7f5ef;
   --card: #ffffff;
   --ink: #1f1f1f;
   --muted: #777;
-  --line: #e4e1da;
-  --accent: #b3261e;      /* 法槌红 */
-  --accent-soft: #fbeceb;
-  --a: #3b6fd8;           /* 组员 A */
-  --b: #e0912f;           /* 组员 B */
-  --c: #3a9a6b;           /* 组员 C */
+  --line: #e6e1d6;
+  --accent: #e86a33;      /* 暖橙主色 */
+  --accent-soft: #fdeee6;
+  --a: #3b7dd8;           /* 室友 A */
+  --b: #d9567c;           /* 室友 B */
+  --c: #3a9a6b;           /* 绿色：和好 */
+  --mid: #8a8f98;         /* 各退一步 */
   --radius: 12px;
   --font: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   --serif: "Songti SC", "SimSun", serif;
@@ -137,6 +138,20 @@ textarea { min-height: 120px; }
 .seg a { flex: 1; text-align: center; padding: 6px 0; font-size: 14px; }
 .seg a.on { background: var(--ink); color: #fff; }
 
-/* 第 4、5 位组员（后端加的，视觉可以改颜色） */
-:root { --d: #8a5cd1; --e: #c2477f; }
-.who.D, .ratio .D { background: var(--d); } .who.E, .ratio .E { background: var(--e); }
+/* ---------- 室友版（v3 新增） ---------- */
+.ratio .mid { background: var(--mid); }
+.choice { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.choice label { margin: 0; font-weight: 600; text-align: center; border: 2px solid var(--line); border-radius: 10px; padding: 12px 4px; cursor: pointer; background: #fff; }
+.choice input { display: none; }
+.choice input:checked + span { color: var(--accent); }
+.choice label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.side { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 720px) { .side { grid-template-columns: 1fr; } }
+.side .card { margin: 0; }
+.pact { background: #e9f6ef; border-color: #bfe3cf; }
+.pact ol { margin: 6px 0 0; padding-left: 20px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips label { margin: 0; font-weight: normal; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; cursor: pointer; background: #fff; }
+.chips input { display: none; }
+.chips label:has(input:checked) { background: var(--accent); color: #fff; border-color: var(--accent); }
+.hero { background: linear-gradient(135deg, #ffb36b, #e86a33); }

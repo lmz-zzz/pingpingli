@@ -1,45 +1,61 @@
-// 评评理 · 后端
+// 评评理 · 后端（室友吃瓜版）
 // 零依赖：只用 Node.js 自带的模块，`node server.js` 就能跑。
-// 页面放在 public/，案子存在 data/cases.json（一个案子一条记录）。
+// 页面放在 public/，数据存在 data/db.json（一个案子一条记录，不需要正经数据库）。
+//
+// 案子的一生：
+//   waiting（等室友应诉）→ recruiting（AI 书记员出案情速览，招募 12 位陪审员）
+//   → voting（席位满了，陪审员投票）→ done（AI 法官判决 + 寝室公约 + AI 点评陪审员）
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { generateDossier, generateVerdict, medianRatio } = require('./lib/ai');
+const ai = require('./lib/ai');
 const { MODEL, hasKey } = require('./lib/llm');
 const seed = require('./lib/seed');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-const DATA_FILE = path.join(DATA_DIR, 'cases.json');
-const JURY_SIZE = 7;
-const LETTERS = ['A', 'B', 'C', 'D', 'E'];
+const DATA_FILE = path.join(DATA_DIR, 'db.json');
+const SEATS = seed.SEATS;
+const DEMO = () => process.env.DEMO_MODE !== 'off'; // 演示模式：放开几个只为录屏方便的捷径，正式运营设 DEMO_MODE=off
 
 // ---------------- 存储 ----------------
 
-let db = { nextNo: 43, cases: {}, users: {}, sessions: {} };
+let db = { nextNo: 44, users: {}, sessions: {}, cases: {} };
 try {
   db = { ...db, ...JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) };
 } catch (_) {}
-// 预置数据每次启动都覆盖成最新版本
-db.cases.demo = JSON.parse(JSON.stringify(seed.demo));
-for (const c of seed.feed) db.cases[c.id] = JSON.parse(JSON.stringify(c));
 
 function save() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 1));
+  fs.writeFileSync(DATA_FILE, JSON.stringify(db));
+}
+const newId = () => Math.random().toString(36).slice(2, 8);
+const clone = (o) => JSON.parse(JSON.stringify(o));
+
+// 预置的已判决案例：算出票数结果和（规则版）陪审员点评
+function finishSeed(c) {
+  c.verdict.result = ai.percentages(tally(c));
+  c.verdict.jurorReview = buildReview(c, ai.ruleEvaluate(c.votes.map((v, i) => ({ i, comment: v.comment }))));
 }
 
-function newId() {
-  return Math.random().toString(36).slice(2, 8);
-}
+// ---------------- 小工具 ----------------
+
+const tally = (c) => {
+  const t = { A: 0, MID: 0, B: 0 };
+  for (const v of c.votes) if (t[v.choice] !== undefined) t[v.choice]++;
+  return t;
+};
+const members = (c) => c.jury.members;
+const seatOf = (c, uid) => (members(c).find((m) => m.userId === uid) || {}).no || 0;
+const isRealUser = (u) => u && !u.seed;
+const likesOf = (v) => (v.likes || 0) + (v.likedBy || []).length; // 预置点赞数 + 真实用户点赞
 
 // ---------------- 账号 ----------------
 // 学校邮箱 + 验证码注册/登录（无密码）；登录后用 HttpOnly cookie 记住身份。
-// 同一个人既能立案，也能被抽中当陪审员。学院+年级用来回避：不会把案子派给同班同学。
-// 演示版不真发邮件：验证码直接返回给页面显示。设 DEMO_MODE=off 时只接受真实发出的码（需另接邮件服务）。
+// 演示版不真发邮件：验证码直接返回给页面显示；DEMO_MODE=off 时不返回（需另接邮件服务）。
 
 const codes = {}; // email -> { code, exp }
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -56,74 +72,205 @@ function login(res, user) {
   res.setHeader('Set-Cookie', `ppl=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`);
 }
 function publicUser(u) {
-  return u && { id: u.id, nickname: u.nickname, email: u.email.replace(/^(.{2}).*(@.*)$/, '$1***$2'), college: u.college, grade: u.grade, juror: u.juror, verified: true };
+  return u && { id: u.id, nickname: u.nickname, email: u.email.replace(/^(.{2}).*(@.*)$/, '$1***$2'), jurorScore: u.jurorScore, verified: true };
 }
-function sameClass(a, b) {
-  return a && b && a.college && a.college === b.college && a.grade && a.grade === b.grade;
-}
-
-// ---------------- 匿名化 ----------------
-
-// 把群聊、文档记录、诉求里的真名替换成 A/B/C
-function anonymize(text, members) {
-  let out = String(text || '');
-  const named = members.filter((m) => m.name && !/^[A-E]$/.test(m.name) && !/^我/.test(m.name));
-  named.sort((a, b) => b.name.length - a.name.length); // 长名字先换，避免“小周周”被换成“B周”
-  for (const m of named) out = out.split(m.name).join(m.id);
-  // 原告自己可能填“我”，群聊里“[时间] 我：……”这种发言人位置也换成 A
-  out = out.replace(/^(\s*\[?[\d\-\/ :]*\]?\s*)我(\s*[：:])/gm, `$1${members[0].id}$2`);
-  return out;
+function notify(uid, text, caseId) {
+  const u = db.users[uid];
+  if (!u || u.seed) return;
+  (u.notifs = u.notifs || []).unshift({ id: newId(), text, caseId, at: new Date().toISOString(), read: false });
+  u.notifs = u.notifs.slice(0, 30);
 }
 
-// 返回给前端前去掉真名
-function publicCase(c, user) {
-  const { chat, doc_log, creatorId, invited, ...rest } = c;
+// ---------------- 陪审信用 ----------------
+
+function scoreInfo(u) {
+  const s = u.jurorScore ?? 60;
+  const star = (x) => Math.max(1, Math.min(5, Math.round(x / 20)));
   return {
-    ...rest,
-    members: c.members.map((m) => ({ id: m.id, agreed: m.agreed })),
-    votes: c.votes.map((v, i) => ({ seat: i + 1, ratio: v.ratio, comment: v.comment, preset: !!v.preset })),
-    juryProgress: { voted: c.votes.length, total: JURY_SIZE },
-    viewer: user
-      ? { isCreator: creatorId === user.id, invited: (invited || []).includes(user.id), hasVoted: c.votes.some((v) => v.userId === user.id) }
-      : null,
+    value: s,
+    title: s >= 85 ? '金牌陪审员' : s >= 70 ? '银牌陪审员' : u.jurorCases ? '靠谱陪审员' : '新晋陪审员',
+    stars: { reason: star(s), constructive: star(s - 5), kind: star(s + 5) },
+    cases: u.jurorCases || 0,
+  };
+}
+
+// ---------------- 对外的案子（去掉真名、聊天原文和所有用户 id） ----------------
+
+function publicVote(c, v, user) {
+  return {
+    no: seatOf(c, v.userId),
+    choice: v.choice,
+    comment: v.comment,
+    likes: likesOf(v),
+    liked: Boolean(user && (v.likedBy || []).includes(user.id)),
+  };
+}
+
+function viewerOf(c, user) {
+  if (!user) return null;
+  const mine = c.votes.find((v) => v.userId === user.id);
+  const app = c.jury.applications.find((a) => a.userId === user.id);
+  const isMember = members(c).some((m) => m.userId === user.id);
+  return {
+    isCreator: c.creatorId === user.id,
+    isRespondent: c.respondentId === user.id,
+    isMember,
+    seatNo: seatOf(c, user.id),
+    voted: Boolean(mine),
+    myChoice: mine && mine.choice,
+    myComment: mine && mine.comment,
+    applied: app ? app.status : null,
+    invited: (c.invitedIds || []).includes(user.id) || Boolean(c.inviteAll),
+    canApply: c.status === 'recruiting' && !isMember && !app && c.creatorId !== user.id && c.respondentId !== user.id,
+    canVote: c.status === 'voting' && isMember,
+  };
+}
+
+function publicCase(c, user) {
+  const t = tally(c);
+  const total = t.A + t.MID + t.B;
+  const votes = c.votes.map((v) => publicVote(c, v, user)).sort((a, b) => b.likes - a.likes);
+  const v = c.verdict;
+  return {
+    id: c.id,
+    no: c.no,
+    category: c.category,
+    title: c.title,
+    status: c.status,
+    claimA: c.claimA,
+    claimB: c.claimB,
+    summary: c.summary,
+    focus: c.focus,
+    watchers: c.watchers || 0,
+    tally: { ...t, total, pct: ai.percentages(t) },
+    jury: {
+      seats: SEATS,
+      filled: members(c).length,
+      voted: total,
+      slots: Array.from({ length: SEATS }, (_, i) => ({ no: i + 1, filled: i < members(c).length, voted: c.votes.some((x) => seatOf(c, x.userId) === i + 1) })),
+      applications: c.jury.applications.length,
+      reasons: c.jury.applications.slice(0, 6).map((a, i) => ({ who: `报名者 ${i + 1}`, reason: a.reason, status: a.status })),
+    },
+    comments: votes.filter((x) => x.comment),
+    verdict: v && { result: v.result, paragraphs: v.paragraphs, pact: v.pact, jurorReview: v.jurorReview.map(({ userId, ...r }) => r), by: v.by },
+    reconciled: c.reconciled,
+    viewer: viewerOf(c, user),
+    inviteLink: user && c.creatorId === user.id ? `file.html?respond=${c.id}` : undefined,
   };
 }
 
 function caseCard(c) {
-  return { id: c.id, no: c.no, course: c.course, assignment: c.assignment, status: c.status, createdAt: c.createdAt, votes: c.votes.length, ratio: c.verdict?.ratio || null, title: c.verdict?.title || null };
+  const t = tally(c);
+  const hot = c.votes.filter((v) => v.comment).sort((a, b) => likesOf(b) - likesOf(a))[0];
+  return {
+    id: c.id,
+    no: c.no,
+    category: c.category,
+    title: c.title,
+    status: c.status,
+    createdAt: c.createdAt,
+    pct: ai.percentages(t),
+    votes: t.A + t.MID + t.B,
+    seatsFilled: members(c).length,
+    seats: SEATS,
+    watchers: c.watchers || 0,
+    commentCount: c.votes.filter((v) => v.comment).length,
+    quote: (c.verdict && c.verdict.pact && c.verdict.pact[0]) || (hot && hot.comment) || '',
+    reconciled: Boolean(c.reconciled.A && c.reconciled.B),
+    focus: c.focus,
+  };
 }
 
 // ---------------- 业务 ----------------
 
+// 室友应诉后开庭：AI 书记员出速览，系统推送邀请给信用高的陪审员
 async function openCourt(c) {
-  c.status = 'drafting';
-  save();
-  const d = await generateDossier(c);
-  const { mock_jurors, ...dossier } = d;
-  c.dossier = dossier;
-  // 演示：预置 6 票（标记为 preset），现场投第 7 票
-  c.votes = mock_jurors.slice(0, JURY_SIZE - 1).map((j) => ({ ratio: j.ratio, comment: j.comment, preset: true }));
-  // 从注册且愿意当陪审员的同学里随机抽 7 位（排除立案人）发邀请
-  const creator = db.users[c.creatorId];
-  const pool = Object.values(db.users).filter((u) => u.juror !== false && u.id !== c.creatorId && !sameClass(u, creator)).map((u) => u.id);
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  c.invited = pool.slice(0, JURY_SIZE);
-  c.status = 'jury';
+  const d = await ai.generateIntake(c);
+  c.summary = d.summary;
+  c.focus = d.focus;
+  c.status = 'recruiting';
+  const pool = Object.values(db.users)
+    .filter((u) => isRealUser(u) && u.id !== c.creatorId && u.id !== c.respondentId)
+    .sort((a, b) => (b.jurorScore ?? 60) - (a.jurorScore ?? 60))
+    .slice(0, SEATS);
+  c.invitedIds = pool.map((u) => u.id);
+  for (const u of pool) notify(u.id, `AI 根据你的陪审信用，邀请你担任《${c.title}》的陪审员`, c.id);
   save();
 }
 
-async function closeJury(c) {
-  const ids = c.members.map((m) => m.id);
-  const ratio = medianRatio(c.votes, ids);
-  c.status = 'deliberating';
-  save();
-  const v = await generateVerdict(c, ratio);
-  c.verdict = { ...v, ratio };
+function addMember(c, userId, source) {
+  if (members(c).some((m) => m.userId === userId) || members(c).length >= SEATS) return false;
+  members(c).push({ userId, source, no: members(c).length + 1 });
+  if (members(c).length >= SEATS) {
+    c.status = 'voting';
+    for (const a of c.jury.applications) if (a.status === 'pending') a.status = 'rejected';
+  }
+  return true;
+}
+
+// 报名后 AI 遴选：在所有待选报名者里，按陪审信用和报名理由挑满空位
+async function runSelection(c, newcomer) {
+  const open = SEATS - members(c).length;
+  const pending = c.jury.applications.filter((a) => a.status === 'pending');
+  if (open <= 0 || !pending.length) return;
+  const list = pending.map((a, i) => {
+    const u = db.users[a.userId] || {};
+    return { i, rep: u.jurorScore ?? 60, cases: u.jurorCases || 0, reason: a.reason };
+  });
+  const { picks } = await ai.selectJury(c, list, open);
+  let chosen = picks.map((p) => pending[p.i]).filter(Boolean);
+  // 演示保险：真人报名者不会被预置的“陪审员”挤掉，免得现场录屏时抽不到自己
+  if (DEMO() && newcomer && !chosen.includes(newcomer) && open > 0) chosen = [newcomer, ...chosen].slice(0, open);
+  for (const a of chosen) {
+    a.status = 'selected';
+    addMember(c, a.userId, 'apply');
+    notify(a.userId, `AI 遴选结果：你入选了《${c.title}》的陪审团`, c.id);
+  }
+  for (const a of pending) if (!chosen.includes(a) && c.status === 'voting') a.status = 'rejected';
+  for (const a of pending) if (a.status === 'rejected') notify(a.userId, `《${c.title}》陪审团已满，这次没选上，下次再来`, c.id);
+}
+
+// 把 AI 的评分换成加减分：最佳 +5，其余按分数 +3 / +1 / 0 / -2
+function buildReview(c, scores) {
+  const arr = c.votes.map((v, i) => ({ i, userId: v.userId, no: seatOf(c, v.userId), comment: v.comment, likes: likesOf(v), score: (scores[i] || { score: 60 }).score, note: (scores[i] || {}).note || '' }));
+  const best = arr.slice().sort((a, b) => b.score - a.score || b.likes - a.likes)[0];
+  return arr
+    .map((x) => ({
+      no: x.no,
+      delta: x === best ? 5 : x.score >= 85 ? 3 : x.score >= 65 ? 1 : x.score >= 45 ? 0 : -2,
+      note: x.note,
+      best: x === best,
+      comment: x.comment,
+      userId: x.userId,
+    }))
+    .sort((a, b) => b.delta - a.delta || a.no - b.no);
+}
+
+async function finalize(c) {
+  c.status = 'judging';
+  const t = tally(c);
+  const hot = c.votes.filter((v) => v.comment).sort((a, b) => likesOf(b) - likesOf(a)).slice(0, 6).map((v) => ({ ...v, likes: likesOf(v) }));
+  const [verdict, scores] = await Promise.all([ai.generateVerdict(c, { ...t, total: t.A + t.MID + t.B }, hot), ai.evaluateJurors({ ...c, applications: c.jury.applications })]);
+  const review = buildReview(c, scores);
+  for (const r of review) {
+    const u = db.users[r.userId];
+    if (!u || u.seed) continue;
+    u.jurorScore = Math.max(0, Math.min(100, (u.jurorScore ?? 60) + r.delta));
+    u.jurorCases = (u.jurorCases || 0) + 1;
+    notify(u.id, `《${c.title}》结案了，AI 点评了你的意见：${r.delta > 0 ? '+' : ''}${r.delta} 分${r.best ? '（最佳陪审员！）' : ''}`, c.id);
+  }
+  c.verdict = { result: ai.percentages(t), paragraphs: verdict.paragraphs, pact: verdict.pact, jurorReview: review, by: verdict.by };
   c.status = 'done';
   save();
+}
+
+// 演示模式下，用户对预置案例的操作（报名、接受邀请）会落在一份复制品上：预置案例永远保持原样，可以反复录屏
+function forFork(c) {
+  if (!(c.seed && DEMO())) return c;
+  const t = clone(c);
+  Object.assign(t, { id: newId(), no: String(db.nextNo++).padStart(4, '0'), seed: false, createdAt: new Date().toISOString() });
+  db.cases[t.id] = t;
+  return t;
 }
 
 // ---------------- 路由 ----------------
@@ -132,6 +279,9 @@ async function api(req, res, url) {
   const parts = url.pathname.split('/').filter(Boolean); // ['api', 'cases', id, action]
   const method = req.method;
   const user = currentUser(req);
+  const need = () => { if (!user) { send(res, 401, { error: '请先登录' }); return false; } return true; };
+
+  if (method === 'GET' && url.pathname === '/api/health') return send(res, 200, { ok: true, model: MODEL, aiReady: hasKey(), demo: DEMO() });
 
   // ---- 账号 ----
   if (method === 'POST' && url.pathname === '/api/send-code') {
@@ -140,9 +290,9 @@ async function api(req, res, url) {
     if (!EMAIL_RE.test(email)) return send(res, 400, { error: '请填写正确的学校邮箱' });
     const code = String(Math.floor(100000 + Math.random() * 900000));
     codes[email] = { code, exp: Date.now() + 10 * 60 * 1000 };
-    return send(res, 200, { ok: true, demoCode: process.env.DEMO_MODE === 'off' ? undefined : code });
+    return send(res, 200, { ok: true, demoCode: DEMO() ? code : undefined });
   }
-  // 注册和登录是同一个动作：邮箱+验证码通过后，没账号就建，有就登录
+  // 注册和登录是同一个动作：邮箱 + 验证码通过后，没账号就建，有就登录
   if (method === 'POST' && (url.pathname === '/api/register' || url.pathname === '/api/login')) {
     const b = await body(req);
     const email = String(b.email || '').trim().toLowerCase();
@@ -151,14 +301,11 @@ async function api(req, res, url) {
     delete codes[email];
     let u = Object.values(db.users).find((x) => x.email === email);
     if (!u) {
-      u = { id: newId(), email, nickname: '', college: '', grade: '', juror: true, createdAt: new Date().toISOString() };
+      u = { id: newId(), email, nickname: '', jurorScore: 60, jurorCases: 0, notifs: [], createdAt: new Date().toISOString() };
       db.users[u.id] = u;
     }
     if (b.nickname) u.nickname = String(b.nickname).trim().slice(0, 20);
     if (!u.nickname) u.nickname = email.split('@')[0].slice(0, 20);
-    if (b.college) u.college = String(b.college).slice(0, 30);
-    if (b.grade) u.grade = String(b.grade).slice(0, 20);
-    if (typeof b.jurorOptIn === 'boolean') u.juror = b.jurorOptIn;
     login(res, u);
     return send(res, 200, { user: publicUser(u) });
   }
@@ -166,100 +313,84 @@ async function api(req, res, url) {
     res.setHeader('Set-Cookie', 'ppl=; Path=/; Max-Age=0');
     return send(res, 200, { ok: true });
   }
-  // 我的：我立的案 + 邀请我陪审的案 + 我投过的案
+
+  // ---- 我的 ----
   if (method === 'GET' && url.pathname === '/api/me') {
     if (!user) return send(res, 200, { user: null });
     const all = Object.values(db.cases).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    const myCases = all.filter((c) => c.creatorId === user.id).map(caseCard);
-    const invites = all.filter((c) => c.status === 'jury' && (c.invited || []).includes(user.id) && !c.votes.some((v) => v.userId === user.id)).map(caseCard);
-    // 陪审记录：我投的比例 vs 最终判决；每人差距都在 10 个百分点以内算“和判决接近”
-    const juryHistory = all
-      .filter((c) => c.votes.some((v) => v.userId === user.id))
-      .map((c) => {
-        const mine = c.votes.find((v) => v.userId === user.id).ratio;
-        const final = c.verdict?.ratio || null;
-        const close = final ? Object.keys(final).every((k) => Math.abs((mine[k] || 0) - final[k]) <= 10) : null;
-        return { ...caseCard(c), myVote: mine, close };
-      });
-    const judged = juryHistory.filter((h) => h.close !== null);
+    const mine = all.filter((c) => c.creatorId === user.id || c.respondentId === user.id);
+    const likes = all.reduce((n, c) => n + c.votes.filter((v) => v.userId === user.id).reduce((s, v) => s + likesOf(v), 0), 0);
     return send(res, 200, {
       user: publicUser(user),
-      myCases,
-      invites,
-      juryHistory,
-      juried: juryHistory,
-      respondInvites: [], // 演示版组员不绑定账号；“等我应诉”暂用示例
-      stats: {
-        cases: myCases.length,
-        juried: juryHistory.length,
-        published: all.filter((c) => c.creatorId === user.id && c.public).length,
-        closeRate: judged.length ? Math.round((judged.filter((h) => h.close).length / judged.length) * 100) : null,
-      },
+      respondInvites: all.filter((c) => c.status === 'waiting' && c.demoInvite && c.creatorId !== user.id).map(caseCard),
+      myCases: mine.map((c) => ({ ...caseCard(c), role: c.creatorId === user.id ? 'A' : 'B' })),
+      stats: { cases: mine.length, voted: all.filter((c) => c.votes.some((v) => v.userId === user.id)).length, likes },
+      notifs: (user.notifs || []).slice(0, 10),
     });
   }
-  if (method === 'POST' && url.pathname === '/api/me') {
-    if (!user) return send(res, 401, { error: '请先登录' });
-    const b = await body(req);
-    if (typeof b.juror === 'boolean') user.juror = b.juror;
-    if (b.college !== undefined) user.college = String(b.college).slice(0, 30);
-    if (b.grade !== undefined) user.grade = String(b.grade).slice(0, 20);
-    save();
-    return send(res, 200, { user: publicUser(user) });
+
+  // ---- 陪审员中心 ----
+  if (method === 'GET' && url.pathname === '/api/me/jury') {
+    if (!need()) return;
+    const all = Object.values(db.cases).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const recruiting = all.filter((c) => c.status === 'recruiting' && c.creatorId !== user.id && c.respondentId !== user.id);
+    const isMember = (c) => members(c).some((m) => m.userId === user.id);
+    const applied = (c) => c.jury.applications.some((a) => a.userId === user.id);
+    const history = all
+      .filter((c) => isMember(c) || applied(c))
+      .filter((c) => c.status === 'voting' || c.status === 'done' || applied(c))
+      .map((c) => {
+        const mine = c.votes.find((v) => v.userId === user.id);
+        const review = c.verdict && c.verdict.jurorReview.find((r) => r.userId === user.id);
+        const app = c.jury.applications.find((a) => a.userId === user.id);
+        return { ...caseCard(c), myChoice: mine && mine.choice, myComment: mine && mine.comment, review: review && { delta: review.delta, best: review.best, note: review.note }, applied: app && app.status, isMember: isMember(c) };
+      });
+    return send(res, 200, {
+      invites: recruiting.filter((c) => !isMember(c) && !applied(c) && ((c.invitedIds || []).includes(user.id) || c.inviteAll)).map(caseCard),
+      openCases: recruiting.filter((c) => !isMember(c) && !applied(c)).map(caseCard),
+      applications: history.filter((h) => h.applied),
+      history,
+      score: scoreInfo(user),
+      notifs: (user.notifs || []).slice(0, 10),
+    });
   }
 
-  if (method === 'GET' && url.pathname === '/api/health') {
-    return send(res, 200, { ok: true, model: MODEL, aiReady: hasKey() });
-  }
-
-  // 判例广场：已公开的判决，最新在前；顺带给出一个等你陪审的案子
-  if (method === 'GET' && url.pathname === '/api/feed') {
-    const all = Object.values(db.cases);
-    const items = all
-      .filter((c) => c.public && c.verdict)
+  // ---- 案子列表（吃瓜广场）----
+  if (method === 'GET' && url.pathname === '/api/cases') {
+    const cat = url.searchParams.get('category');
+    const items = Object.values(db.cases)
+      .filter((c) => c.status !== 'waiting' && c.status !== 'judging')
+      .filter((c) => !cat || cat === '全部' || c.category === cat)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((c) => ({
-        id: c.id,
-        course: c.course,
-        title: c.verdict.title,
-        ratio: c.verdict.ratio,
-        quote: c.votes.find((v) => v.comment)?.comment || '',
-        createdAt: c.createdAt,
-        stats: c.stats,
-      }));
-    const mine = user && all.filter((c) => c.status === 'jury' && (c.invited || []).includes(user.id) && !c.votes.some((v) => v.userId === user.id)).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    const pending = mine || all.filter((c) => c.status === 'jury' && c.id !== 'demo' && c.creatorId !== user?.id && !c.votes.some((v) => user && v.userId === user.id)).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] || db.cases.demo;
-    return send(res, 200, { items, user: publicUser(user), invite: { id: pending.id, course: pending.course, assignment: pending.assignment, forYou: Boolean(mine) } });
+      .map(caseCard);
+    return send(res, 200, { items, user: publicUser(user) });
   }
 
-  // 立案
+  // ---- 立案 ----
   if (method === 'POST' && parts.length === 2 && parts[1] === 'cases') {
-    if (!user) return send(res, 401, { error: '请先登录再立案' });
+    if (!need()) return;
     const b = await body(req);
-    const members = (Array.isArray(b.members) ? b.members : [])
-      .slice(0, LETTERS.length)
-      .map((name, i) => ({ id: LETTERS[i], name: String(name || '').slice(0, 20), agreed: i === 0 }));
-    if (members.length < 2) return send(res, 400, { error: '至少要有 2 位组员' });
-    if (!String(b.chat || '').trim()) return send(res, 400, { error: '请粘贴群聊记录' });
+    if (!String(b.title || '').trim() || !String(b.claimA || '').trim()) return send(res, 400, { error: '请填写标题和你的说法' });
     const c = {
       id: newId(),
       no: String(db.nextNo++).padStart(4, '0'),
       createdAt: new Date().toISOString(),
-      course: String(b.course || '未命名课程').slice(0, 40),
-      assignment: String(b.assignment || '小组作业').slice(0, 80),
-      plaintiff: 'A',
+      category: String(b.category || '其他').slice(0, 10),
+      title: String(b.title).trim().slice(0, 60),
+      claimA: String(b.claimA).trim().slice(0, 600),
+      claimB: '',
+      chat: String(b.chat || '').slice(0, 8000),
       creatorId: user.id,
-      invited: [],
-      members,
-      chat: anonymize(String(b.chat).slice(0, 20000), members),
-      doc_log: anonymize(String(b.doc_log || '').slice(0, 5000), members),
-      claim: anonymize(String(b.claim || '').slice(0, 500), members),
-      defense: '',
+      respondentId: null,
       status: 'waiting',
-      dossier: null,
+      summary: '',
+      focus: '',
+      jury: { seats: SEATS, members: [], applications: [] },
       votes: [],
       verdict: null,
-      public: false,
-      stats: { views: 0, agree: 0, comments: 0 },
+      reconciled: { A: false, B: false },
+      invitedIds: [],
+      watchers: 0,
     };
     db.cases[c.id] = c;
     save();
@@ -270,72 +401,118 @@ async function api(req, res, url) {
   if (parts[1] === 'cases' && parts[2] && !c) return send(res, 404, { error: '案子不存在' });
 
   if (c && method === 'GET' && parts.length === 3) {
+    if (!user || c.creatorId !== user.id) c.watchers = (c.watchers || 0) + 1;
     return send(res, 200, publicCase(c, user));
   }
 
-  // 组员同意应诉（演示里“模拟全部同意”会一次把所有人都设为同意），全部同意后开庭、生成卷宗
-  if (c && method === 'POST' && parts[3] === 'agree') {
+  // 室友应诉：写下自己的说法，案子开庭
+  if (c && method === 'POST' && parts[3] === 'respond') {
+    if (!need()) return;
     const b = await body(req);
-    if (b.defense) c.defense = anonymize(String(b.defense).slice(0, 500), c.members);
-    if (b.member) {
-      const m = c.members.find((x) => x.id === b.member);
-      if (m) m.agreed = true;
-    } else {
-      c.members.forEach((m) => (m.agreed = true));
-    }
+    if (c.status !== 'waiting') return send(res, 400, { error: '这个案子已经开庭了' });
+    const demo = DEMO() && b.demo;
+    if (c.creatorId === user.id && !demo) return send(res, 400, { error: '请让你的室友来写他的说法' });
+    c.claimB = String(b.claimB || '').trim().slice(0, 600) || '我也有自己的难处，愿意和室友一起找个办法。';
+    c.respondentId = c.creatorId === user.id ? 'demo-roommate' : user.id;
+    await openCourt(c);
+    return send(res, 200, publicCase(c, user));
+  }
+
+  // 报名当陪审员：写理由 + 勾客观承诺，AI 遴选
+  if (c && method === 'POST' && parts[3] === 'apply') {
+    if (!need()) return;
+    const b = await body(req);
+    const v = viewerOf(c, user);
+    const demo = DEMO();
+    if (c.status !== 'recruiting') return send(res, 400, { error: '这个案子现在不招陪审员了' });
+    if (v.isMember || v.applied) return send(res, 400, { error: '你已经报过名了' });
+    if (!demo && (v.isCreator || v.isRespondent)) return send(res, 400, { error: '当事人不能当本案的陪审员' });
+    if (!b.pledge) return send(res, 400, { error: '请勾选客观承诺' });
+    const reason = String(b.reason || '').trim().slice(0, 100);
+    if (reason.length < 4) return send(res, 400, { error: '请写一句报名理由（至少 4 个字）' });
+    const t = forFork(c);
+    const app = { userId: user.id, reason, pledge: true, status: 'pending', at: new Date().toISOString() };
+    t.jury.applications.push(app);
+    await runSelection(t, app);
     save();
-    if (c.members.every((m) => m.agreed) && c.status === 'waiting') await openCourt(c);
+    return send(res, 200, publicCase(t, user));
+  }
+
+  // 接受系统的陪审邀请
+  if (c && method === 'POST' && parts[3] === 'accept-invite') {
+    if (!need()) return;
+    const v = viewerOf(c, user);
+    if (c.status !== 'recruiting' || v.isMember || !v.invited) return send(res, 400, { error: '这个邀请已经失效了' });
+    const t = forFork(c);
+    addMember(t, user.id, 'invite');
+    save();
+    return send(res, 200, publicCase(t, user));
+  }
+
+  // 陪审员投票（再投一次会覆盖上一次）
+  if (c && method === 'POST' && parts[3] === 'votes') {
+    if (!need()) return;
+    const b = await body(req);
+    if (c.status !== 'voting' && !(DEMO() && c.status === 'recruiting' && members(c).some((m) => m.userId === user.id))) return send(res, 400, { error: '现在还不能投票，等陪审席坐满' });
+    if (!members(c).some((m) => m.userId === user.id)) return send(res, 403, { error: '只有本案陪审员可以投票。你可以围观、点赞，或者去报名' });
+    if (!['A', 'MID', 'B'].includes(b.choice)) return send(res, 400, { error: '请选择支持 A、各退一步或支持 B' });
+    const comment = String(b.comment || '').trim().slice(0, 80);
+    const old = c.votes.find((v) => v.userId === user.id);
+    if (old) Object.assign(old, { choice: b.choice, comment });
+    else c.votes.push({ userId: user.id, choice: b.choice, comment, likes: 0, likedBy: [] });
+    save();
     return send(res, 200, publicCase(c, user));
   }
 
-  // 陪审员投票；第 7 票到齐后写判决书
-  if (c && method === 'POST' && parts[3] === 'votes') {
-    if (!user) return send(res, 401, { error: '请先登录再陪审' });
-    if (c.status !== 'jury') return send(res, 400, { error: '这个案子现在不能投票' });
+  // 围观群众给陪审员意见点赞
+  if (c && method === 'POST' && parts[3] === 'like') {
+    if (!need()) return;
     const b = await body(req);
-    // 演示模式下允许立案人点“演示用”按钮替陪审员投第 7 票，录屏不用来回切账号；设 DEMO_MODE=off 可关闭
-    const demoVote = b.asDemoJuror && process.env.DEMO_MODE !== 'off';
-    if (!demoVote && c.creatorId === user.id) return send(res, 400, { error: '不能给自己的案子当陪审员' });
-    if (!demoVote && c.votes.some((v) => v.userId === user.id)) return send(res, 400, { error: '你已经投过票了' });
-    const ids = c.members.map((m) => m.id);
-    const ratio = {};
-    let sum = 0;
-    for (const id of ids) {
-      ratio[id] = Math.max(0, Math.min(100, Math.round(+b.ratio?.[id] || 0)));
-      sum += ratio[id];
-    }
-    if (sum !== 100) return send(res, 400, { error: `比例合计要等于 100%，现在是 ${sum}%` });
-    // demo 案永远停在 6 票：投票时复制一份新案子，方便反复演示
+    const v = c.votes.find((x) => seatOf(c, x.userId) === +b.no);
+    if (!v || v.userId === user.id) return send(res, 400, { error: '不能给自己点赞哦' });
+    v.likedBy = v.likedBy || [];
+    const i = v.likedBy.indexOf(user.id);
+    if (i >= 0) v.likedBy.splice(i, 1);
+    else v.likedBy.push(user.id);
+    save();
+    return send(res, 200, publicCase(c, user));
+  }
+
+  // 生成判决：投票席全部投完，或者创案人/演示模式手动触发（预置案例会复制一份，原案例保持可重复演示）
+  if (c && method === 'POST' && parts[3] === 'verdict') {
+    if (!need()) return;
+    if (c.status === 'done') return send(res, 200, publicCase(c, user));
+    const voted = c.votes.length;
+    const all = voted >= SEATS || (members(c).length >= SEATS && voted >= members(c).length);
+    if (!all && !(DEMO() && voted >= 1) && c.creatorId !== user.id) return send(res, 400, { error: `陪审团还没投完（${voted} / ${SEATS}）` });
+    if (voted < 1) return send(res, 400, { error: '还没有人投票' });
     let target = c;
-    if (c.id === 'demo') {
-      target = JSON.parse(JSON.stringify(c));
-      target.id = newId();
-      target.no = String(db.nextNo++).padStart(4, '0');
-      target.createdAt = new Date().toISOString();
+    if (c.seed) {
+      target = clone(c);
+      Object.assign(target, { id: newId(), no: String(db.nextNo++).padStart(4, '0'), seed: false, createdAt: new Date().toISOString(), creatorId: user.id, watchers: c.watchers });
       db.cases[target.id] = target;
     }
-    target.votes.push({ ratio, comment: String(b.comment || '').slice(0, 60), userId: demoVote ? 'demo-juror' : user.id });
-    save();
-    if (target.votes.length >= JURY_SIZE) await closeJury(target);
+    await finalize(target);
     return send(res, 200, publicCase(target, user));
   }
 
-  // 公开到判例广场 / 围观点“同判”
-  if (c && method === 'POST' && parts[3] === 'publish') {
-    if (!c.verdict) return send(res, 400, { error: '还没有判决' });
-    if (!user || user.id !== c.creatorId) return send(res, 403, { error: '只有立案人可以公开' });
-    c.public = true;
+  // 握手言和：A、B 各自确认
+  if (c && method === 'POST' && parts[3] === 'reconcile') {
+    if (!need()) return;
+    const b = await body(req);
+    if (c.status !== 'done') return send(res, 400, { error: '判决之后才能握手言和' });
+    let who = c.creatorId === user.id ? 'A' : c.respondentId === user.id ? 'B' : null;
+    if (DEMO() && b.demo && (b.who === 'A' || b.who === 'B')) who = b.who; // 演示捷径：模拟另一位室友也确认
+    if (!who) return send(res, 403, { error: '只有案子的两位室友可以确认' });
+    c.reconciled[who] = true;
     save();
     return send(res, 200, publicCase(c, user));
-  }
-  if (c && method === 'POST' && parts[3] === 'agree-verdict') {
-    c.stats.agree++;
-    save();
-    return send(res, 200, { agree: c.stats.agree });
   }
 
   return send(res, 404, { error: '没有这个接口' });
 }
+
+// ---------------- 静态页面 ----------------
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.json': 'application/json' };
 
@@ -369,6 +546,14 @@ function body(req) {
   });
 }
 
+// 预置数据每次启动都覆盖成最新版本
+for (const u of seed.SEED_USERS) db.users[u.id] = clone(u);
+for (const c of seed.seedCases) {
+  const cc = clone(c);
+  if (cc.status === 'done') finishSeed(cc);
+  db.cases[cc.id] = cc;
+}
+
 http
   .createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
@@ -382,5 +567,5 @@ http
     }
   })
   .listen(PORT, () => {
-    console.log(`评评理已启动：http://localhost:${PORT}  模型：${MODEL}  ${hasKey() ? 'AI 已接通' : '未配置 LLM_API_KEY，使用规则兜底'}`);
+    console.log(`评评理已启动：http://localhost:${PORT}  模型：${MODEL}  ${hasKey() ? 'AI 已接通' : '未配置 LLM_API_KEY，使用规则兜底'}${DEMO() ? '  [演示模式]' : ''}`);
   });

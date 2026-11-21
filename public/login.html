@@ -8,40 +8,31 @@
 </head>
 <body>
 <!-- 页面：注册 / 登录
-     后端：POST /api/register {email, code, nickname, college, grade, jurorOptIn}；POST /api/login
-     演示时：直接点“进入评评理”用预置账号登录 -->
+     后端：POST /api/register {email, code, nickname}；POST /api/login
+     演示：验证码显示在 data-bind="demo-code" 里 -->
+
 <main class="page">
   <div class="auth">
-    <a class="logo" href="index.html">评评<span style="color:var(--accent)">理</span></a>
-    <p class="muted" style="text-align:center">一个账号，既能立案，也能当陪审员</p>
-
-    <form class="card" action="index.html">
+    <a class="logo" href="index.html">评评<span style="color:var(--accent)">理</span> 🍉</a>
+    <p class="muted" style="text-align:center">室友之间那点小事，来让大家评评理</p>
+    <form class="card" id="register-form" action="index.html">
       <div class="seg"><a class="on" href="#">注册</a><a href="#">登录</a></div>
-
       <label>学校邮箱</label>
-      <div class="row"><input type="text" name="email" value="2023xxxx@ruc.edu.cn" style="flex:1"><a class="btn" href="#">发验证码</a></div>
-      <p class="hint">只有本校同学能注册，陪审团才是“同学评同学”。</p>
+      <div class="row"><input type="text" name="email" value="2023xxxx@ruc.edu.cn" style="flex:1"><a class="btn" href="#" id="send-code">发验证码</a></div>
+      <p class="hint">只有本校同学能注册，来评理的都是同学。</p>
       <label>验证码</label>
       <input type="text" name="code" value="482913">
       <p class="demo-note" data-bind="demo-code">演示版：验证码直接显示在这里 482913</p>
-
       <label>昵称</label>
-      <input type="text" name="nickname" value="不想平分的人">
-      <p class="hint">昵称只在你自己的页面显示。卷宗和判例广场里一律匿名。</p>
-
-      <div class="row" style="gap:12px">
-        <div style="flex:1"><label>学院</label><select name="college"><option>新闻学院</option><option>信息学院</option><option>社会与人口学院</option></select></div>
-        <div style="flex:1"><label>年级</label><select name="grade"><option>2023 级</option><option>2024 级</option><option>2025 级</option></select></div>
-      </div>
-      <p class="hint">用来回避：学院和年级都相同的同学，不会被抽为彼此案子的陪审员。</p>
-
-      <label class="check"><input type="checkbox" name="jurorOptIn" checked><span>我愿意被随机抽中，当别人案子的陪审员</span></label>
-      <label class="check"><input type="checkbox" checked><span>我同意《评评理公约》：不挂人、不泄露卷宗、凭良心投票</span></label>
-
-      <button class="btn primary block" type="submit">进入评评理</button>
+      <input type="text" name="nickname" value="今天也想睡个好觉">
+      <p class="hint">案子里一律显示为“室友 A / 室友 B”，不会出现昵称和真名。</p>
+      <label class="check"><input type="checkbox" checked><span>我同意《评评理公约》：只评事，不评人；不晒真名、不晒宿舍号</span></label>
+      <button class="btn primary block" type="submit">进来吃瓜</button>
     </form>
   </div>
 </main>
+
+
 <script src="app.js"></script>
 </body>
 </html>
