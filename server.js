@@ -138,7 +138,9 @@ function publicCase(c, user) {
     title: c.title,
     status: c.status,
     claimA: c.claimA,
-    claimB: c.claimB,
+    claimB: c.solo ? '（室友 B 暂未回应，本案为单方面展示）' : c.claimB,
+    solo: Boolean(c.solo),
+    privacy: user && c.creatorId === user.id ? c.privacy : undefined,
     summary: c.summary,
     focus: c.focus,
     watchers: c.watchers || 0,
@@ -171,6 +173,7 @@ function caseCard(c) {
     createdAt: c.createdAt,
     pct: ai.percentages(t),
     votes: t.A + t.MID + t.B,
+    solo: Boolean(c.solo),
     seatsFilled: members(c).length,
     seats: SEATS,
     watchers: c.watchers || 0,
@@ -371,15 +374,20 @@ async function api(req, res, url) {
     if (!need()) return;
     const b = await body(req);
     if (!String(b.title || '').trim() || !String(b.claimA || '').trim()) return send(res, 400, { error: '请填写标题和你的说法' });
+    // 隐私审核 + 降火：进入案子之前，先隐去可识别信息、把情绪化措辞改平和；不合适的内容直接拒收
+    const rv = await ai.reviewPrivacy({ title: String(b.title).trim().slice(0, 60), claim: String(b.claimA).trim().slice(0, 600), chat: String(b.chat || '').slice(0, 8000) });
+    if (!rv.ok) return send(res, 400, { error: rv.reason });
     const c = {
       id: newId(),
       no: String(db.nextNo++).padStart(4, '0'),
       createdAt: new Date().toISOString(),
       category: String(b.category || '其他').slice(0, 10),
-      title: String(b.title).trim().slice(0, 60),
-      claimA: String(b.claimA).trim().slice(0, 600),
+      title: rv.title.slice(0, 60),
+      claimA: rv.claim.slice(0, 600),
       claimB: '',
-      chat: String(b.chat || '').slice(0, 8000),
+      chat: rv.chat.slice(0, 8000),
+      privacy: { redactions: rv.redactions, softened: rv.softened, by: rv.by },
+      solo: false,
       creatorId: user.id,
       respondentId: null,
       status: 'waiting',
@@ -412,8 +420,26 @@ async function api(req, res, url) {
     if (c.status !== 'waiting') return send(res, 400, { error: '这个案子已经开庭了' });
     const demo = DEMO() && b.demo;
     if (c.creatorId === user.id && !demo) return send(res, 400, { error: '请让你的室友来写他的说法' });
-    c.claimB = String(b.claimB || '').trim().slice(0, 600) || '我也有自己的难处，愿意和室友一起找个办法。';
+    const raw = String(b.claimB || '').trim().slice(0, 600) || '我也有自己的难处，愿意和室友一起找个办法。';
+    const rv = await ai.reviewPrivacy({ title: c.title, claim: raw });
+    if (!rv.ok) return send(res, 400, { error: rv.reason });
+    c.claimB = rv.claim.slice(0, 600);
+    c.privacyB = { redactions: rv.redactions, softened: rv.softened };
     c.respondentId = c.creatorId === user.id ? 'demo-roommate' : user.id;
+    await openCourt(c);
+    return send(res, 200, publicCase(c, user));
+  }
+
+  // 单方面展示：室友不愿应诉时，立案人可以让案子直接上广场（隐私已在立案时由 AI 审核并匿名）
+  if (c && method === 'POST' && parts[3] === 'solo') {
+    if (!need()) return;
+    if (c.creatorId !== user.id && !DEMO()) return send(res, 403, { error: '只有立案人可以选择单方面展示' });
+    if (c.status !== 'waiting') return send(res, 400, { error: '这个案子已经开庭了' });
+    // 单方面展示会把内容公开给全校，隐私必须由 AI 严格审核过；规则只能识别手机号、宿舍号这类固定格式，认不出真名
+    if ((!c.privacy || c.privacy.by !== 'ai') && !process.env.ALLOW_SOLO_WITHOUT_AI) return send(res, 400, { error: 'AI 隐私审核暂时没连上，为了保护你和室友的隐私，暂时不能单方面展示，请稍后再试。' });
+    c.solo = true;
+    c.claimB = '';
+    c.respondentId = null;
     await openCourt(c);
     return send(res, 200, publicCase(c, user));
   }

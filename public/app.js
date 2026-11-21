@@ -44,6 +44,9 @@
     return `<div class="ratio" style="margin:8px 0${big ? ';height:40px;font-size:14px' : ''}"><span class="A" style="width:${pct.A}%">${label('A', full.A)}</span><span class="mid" style="width:${pct.MID}%">${label('MID', full.MID)}</span><span class="B" style="width:${pct.B}%">${label('B', full.B)}</span></div>`;
   }
   function statusBadge(c) {
+    return statusBadge0(c) + (c.solo ? ' <span class="badge">单方面展示</span>' : '');
+  }
+  function statusBadge0(c) {
     if (c.status === 'recruiting') return `<span class="badge blue">招募陪审员 ${c.seatsFilled}/${c.seats}</span>`;
     if (c.status === 'voting') return '<span class="badge blue">投票中</span>';
     if (c.status === 'waiting') return '<span class="badge">等室友应诉</span>';
@@ -183,8 +186,20 @@
           <input type="text" readonly value="${esc(link)}" id="invite-link" style="margin:6px 0">
           <a class="btn block" href="#" id="copy-link">复制邀请链接</a>
           <div class="stat"><span><span class="who B">B</span> 室友 B</span><span>⏳ 等待中</span></div>
+          ${c.privacy ? `<p class="hint">🛡 AI 已审核隐私：${c.privacy.redactions.length ? '隐去了 ' + esc(c.privacy.redactions.join('、')) : '没有发现可识别信息'}${c.privacy.softened ? '，并把情绪化的措辞改平和了' : ''}。</p>` : ''}
+          <a class="btn block" href="#" id="go-solo" style="margin-top:8px">室友不愿应诉？单方面展示</a>
+          <p class="hint">单方面展示时，案子会匿名上广场，并明确标注“室友 B 暂未回应”；AI 法官只给善意建议，不判对错。</p>
           <p class="demo-note">演示用：<a href="#" id="sim-agree"><u>模拟室友同意 → 开庭</u></a></p>`;
         $('#copy-link').addEventListener('click', async (e) => { e.preventDefault(); try { await navigator.clipboard.writeText(link); e.target.textContent = '✅ 已复制'; } catch (_) { $('#invite-link').select(); } });
+        $('#go-solo').addEventListener('click', async (e) => {
+          e.preventDefault();
+          if (!confirm('确定单方面展示吗？案子会匿名上广场，室友之后仍可来补充自己的说法。')) return;
+          busy('AI 书记员正在整理案情…（约 10~30 秒）');
+          try {
+            await api(`/cases/${c.id}/solo`, {});
+            location.href = 'case.html?id=' + c.id;
+          } catch (err) { fail(err); }
+        });
         $('#sim-agree').addEventListener('click', async (e) => {
           e.preventDefault();
           busy('室友同意了，AI 书记员正在整理案情…（约 10~30 秒）');
@@ -212,6 +227,7 @@
     bind('title').textContent = c.title;
     bind('summary').textContent = c.summary || '室友还没有应诉，案子还没开庭。';
     bind('focus').textContent = c.focus || '—';
+    if (c.solo) bind('focus').closest('p').insertAdjacentHTML('afterend', '<p class="hint">📢 本案为单方面展示：室友 B 暂未回应，大家只听到了一方说法，评理时请多一点宽容。</p>');
     bind('claimA').textContent = c.claimA;
     bind('claimB').textContent = c.claimB || '（室友还没写）';
     $$('.side .card b').forEach((b) => (b.textContent = b.closest('.card').querySelector('.who').textContent === 'A' ? '室友 A 的说法' : '室友 B 的说法'));
