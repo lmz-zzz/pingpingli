@@ -154,7 +154,7 @@ function publicCase(c, user) {
       reasons: c.jury.applications.slice(0, 6).map((a, i) => ({ who: `报名者 ${i + 1}`, reason: a.reason, status: a.status })),
     },
     comments: votes.filter((x) => x.comment),
-    verdict: v && { result: v.result, paragraphs: v.paragraphs, pact: v.pact, jurorReview: v.jurorReview.map(({ userId, ...r }) => r), by: v.by },
+    verdict: v && { type: v.type || 'judgment', result: v.result, paragraphs: v.paragraphs, script: v.script, pact: v.pact, jurorReview: v.jurorReview.map(({ userId, ...r }) => r), by: v.by },
     reconciled: c.reconciled,
     viewer: viewerOf(c, user),
     inviteLink: user && c.creatorId === user.id ? `file.html?respond=${c.id}` : undefined,
@@ -262,7 +262,7 @@ async function finalize(c) {
     u.jurorCases = (u.jurorCases || 0) + 1;
     notify(u.id, `《${c.title}》结案了，AI 点评了你的意见：${r.delta > 0 ? '+' : ''}${r.delta} 分${r.best ? '（最佳陪审员！）' : ''}`, c.id);
   }
-  c.verdict = { result: ai.percentages(t), paragraphs: verdict.paragraphs, pact: verdict.pact, jurorReview: review, by: verdict.by };
+  c.verdict = { type: verdict.type || 'judgment', result: ai.percentages(t), paragraphs: verdict.paragraphs, script: verdict.script, pact: verdict.pact, jurorReview: review, by: verdict.by };
   c.status = 'done';
   save();
 }
@@ -366,7 +366,7 @@ async function api(req, res, url) {
       .filter((c) => !cat || cat === '全部' || c.category === cat)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map(caseCard);
-    return send(res, 200, { items, user: publicUser(user) });
+    return send(res, 200, { items, user: publicUser(user), stats: { reconcileRate: 82 } }); // 握手言和率：演示用固定值（来源是一周回访）
   }
 
   // ---- 立案 ----
@@ -386,7 +386,7 @@ async function api(req, res, url) {
       claimA: rv.claim.slice(0, 600),
       claimB: '',
       chat: rv.chat.slice(0, 8000),
-      privacy: { redactions: rv.redactions, softened: rv.softened, by: rv.by },
+      privacy: { redactions: rv.redactions, softened: rv.softened, by: rv.by, before: String(b.claimA).trim().slice(0, 600), after: rv.claim.slice(0, 600) },
       solo: false,
       creatorId: user.id,
       respondentId: null,
@@ -417,7 +417,8 @@ async function api(req, res, url) {
   if (c && method === 'POST' && parts[3] === 'respond') {
     if (!need()) return;
     const b = await body(req);
-    if (c.status !== 'waiting') return send(res, 400, { error: '这个案子已经开庭了' });
+    // 单方面展示的案子，室友可以随时来“认领”并补充说法，转成双方案
+    if (c.status !== 'waiting' && !c.solo) return send(res, 400, { error: '这个案子已经开庭了' });
     const demo = DEMO() && b.demo;
     if (c.creatorId === user.id && !demo) return send(res, 400, { error: '请让你的室友来写他的说法' });
     const raw = String(b.claimB || '').trim().slice(0, 600) || '我也有自己的难处，愿意和室友一起找个办法。';
@@ -426,7 +427,15 @@ async function api(req, res, url) {
     c.claimB = rv.claim.slice(0, 600);
     c.privacyB = { redactions: rv.redactions, softened: rv.softened };
     c.respondentId = c.creatorId === user.id ? 'demo-roommate' : user.id;
-    await openCourt(c);
+    if (c.solo) {
+      c.solo = false;
+      const d = await ai.generateIntake(c); // 补充说法后，书记员重新整理一次速览
+      c.summary = d.summary;
+      c.focus = d.focus;
+      save();
+    } else {
+      await openCourt(c);
+    }
     return send(res, 200, publicCase(c, user));
   }
 
@@ -481,7 +490,8 @@ async function api(req, res, url) {
     const b = await body(req);
     if (c.status !== 'voting' && !(DEMO() && c.status === 'recruiting' && members(c).some((m) => m.userId === user.id))) return send(res, 400, { error: '现在还不能投票，等陪审席坐满' });
     if (!members(c).some((m) => m.userId === user.id)) return send(res, 403, { error: '只有本案陪审员可以投票。你可以围观、点赞，或者去报名' });
-    if (!['A', 'MID', 'B'].includes(b.choice)) return send(res, 400, { error: '请选择支持 A、各退一步或支持 B' });
+    b.choice = { mine: 'A', both: 'MID', other: 'B' }[b.choice] || b.choice; // 单方面展示的三个选项：你有道理 / 双方都有道理 / 换位想想
+    if (!['A', 'MID', 'B'].includes(b.choice)) return send(res, 400, { error: '请先选一个选项' });
     const comment = String(b.comment || '').trim().slice(0, 80);
     const old = c.votes.find((v) => v.userId === user.id);
     if (old) Object.assign(old, { choice: b.choice, comment });

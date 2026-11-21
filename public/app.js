@@ -10,6 +10,8 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   const here = () => encodeURIComponent(location.pathname.slice(1) + location.search);
   const CHOICE = { A: '支持 A', MID: '各退一步', B: '支持 B' };
+  const SOLO_CHOICE = { A: '你有道理', MID: '双方都有道理', B: '换位想想' };
+  const choiceText = (c, k) => ((c && c.solo) ? SOLO_CHOICE : CHOICE)[k];
 
   async function api(path, data) {
     const res = await fetch('/api' + path, data === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
@@ -119,10 +121,12 @@
     const filters = bind('filters');
     let cat = '全部';
     async function load() {
-      const { items } = await api('/cases?category=' + encodeURIComponent(cat));
+      const { items, stats } = await api('/cases?category=' + encodeURIComponent(cat));
+      const ban = $('#rate-banner') || (() => { const d = document.createElement('p'); d.id = 'rate-banner'; d.className = 'hint'; bind('feed').insertAdjacentElement('beforebegin', d); return d; })();
+      if (stats) ban.textContent = `🤝 评评理握手言和率 ${stats.reconcileRate}%`;
       bind('feed').innerHTML = items.length ? items.map((c) => `
         <a class="card" href="${caseHref(c)}" style="display:block">
-          <div class="row"><span class="tag">${esc(c.category)}</span><span class="spacer"></span>${statusBadge(c)}</div>
+          <div class="row"><span class="tag">${esc(c.category)}</span>${c.solo ? '' : '<span class="tag">双方案</span>'}<span class="spacer"></span>${statusBadge(c)}</div>
           <h3 style="margin-top:6px">${esc(c.title)}</h3>
           ${c.votes ? bar(c.pct) : `<p class="muted" style="margin:8px 0">${c.status === 'recruiting' ? '正在招募陪审员，欢迎报名' : '陪审员正在评理'}</p>`}
           ${c.quote ? `<p class="quote">${c.status === 'done' ? '寝室公约：' : '热评：'}${esc(c.quote)}</p>` : `<p class="muted">${esc(c.focus || '')}</p>`}
@@ -186,6 +190,7 @@
           <input type="text" readonly value="${esc(link)}" id="invite-link" style="margin:6px 0">
           <a class="btn block" href="#" id="copy-link">复制邀请链接</a>
           <div class="stat"><span><span class="who B">B</span> 室友 B</span><span>⏳ 等待中</span></div>
+          ${c.privacy && c.privacy.before !== undefined && c.privacy.after !== c.privacy.before ? `<details class="hint" open><summary>🛡 降火前后对比</summary><p class="muted">原文：${esc(c.privacy.before)}</p><p class="quote">展示：${esc(c.privacy.after)}</p></details>` : ''}
           ${c.privacy ? `<p class="hint">🛡 AI 已审核隐私：${c.privacy.redactions.length ? '隐去了 ' + esc(c.privacy.redactions.join('、')) : '没有发现可识别信息'}${c.privacy.softened ? '，并把情绪化的措辞改平和了' : ''}。</p>` : ''}
           <a class="btn block" href="#" id="go-solo" style="margin-top:8px">室友不愿应诉？单方面展示</a>
           <p class="hint">单方面展示时，案子会匿名上广场，并明确标注“室友 B 暂未回应”；AI 法官只给善意建议，不判对错。</p>
@@ -227,7 +232,10 @@
     bind('title').textContent = c.title;
     bind('summary').textContent = c.summary || '室友还没有应诉，案子还没开庭。';
     bind('focus').textContent = c.focus || '—';
-    if (c.solo) bind('focus').closest('p').insertAdjacentHTML('afterend', '<p class="hint">📢 本案为单方面展示：室友 B 暂未回应，大家只听到了一方说法，评理时请多一点宽容。</p>');
+    if (c.solo) {
+      bind('focus').closest('p').insertAdjacentHTML('afterend', '<p class="hint">📢 本案为单方面展示：室友 B 暂未回应，大家只听到了一方说法，评理时请多一点宽容。<br><a href="file.html?respond=' + esc(c.id) + '"><u>这是我，我来补充说法</u></a></p>');
+      $$('input[name=choice]', $('#vote-form')).forEach((r) => { const sp = r.nextElementSibling; if (sp) sp.textContent = SOLO_CHOICE[r.value]; });
+    }
     bind('claimA').textContent = c.claimA;
     bind('claimB').textContent = c.claimB || '（室友还没写）';
     $$('.side .card b').forEach((b) => (b.textContent = b.closest('.card').querySelector('.who').textContent === 'A' ? '室友 A 的说法' : '室友 B 的说法'));
@@ -247,7 +255,7 @@
     // 意见 + 点赞
     function renderComments(list) {
       bind('comments').innerHTML = `<h3>🔥 陪审员意见 <span class="muted">（围观群众可以点赞）</span></h3>` +
-        (list.length ? list.map((x) => `<p class="quote">${x.no} 号 · ${CHOICE[x.choice]}：${esc(x.comment)} <span class="muted"><a href="#" data-like="${x.no}">${x.liked ? '👍' : '👍'} ${x.likes}</a></span></p>`).join('') : '<p class="muted">陪审员还没有发表意见。</p>');
+        (list.length ? list.map((x) => `<p class="quote">${x.no} 号 · ${choiceText(c, x.choice)}：${esc(x.comment)} <span class="muted"><a href="#" data-like="${x.no}">${x.liked ? '👍' : '👍'} ${x.likes}</a></span></p>`).join('') : '<p class="muted">陪审员还没有发表意见。</p>');
     }
     renderComments(c.comments);
     bind('comments').addEventListener('click', async (e) => {
@@ -327,15 +335,19 @@
     }
     const v = c.verdict;
     bind('result').innerHTML = `<h2>陪审团意见 · ${v.result.total} 票</h2>${bar(v.result, true)}`;
-    bind('verdict-text').innerHTML = `<h1>判 决 书</h1><p class="no">（2026）评字第 ${esc(c.no)} 号 · ${esc(c.title)}</p>${v.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('')}<div class="seal"><b>评评理<br>AI 法庭</b></div>`;
+    bind('verdict-text').innerHTML = `<h1>${v.type === 'advice' ? '建 议 书' : '判 决 书'}</h1><p class="no">${v.type === 'advice' ? '' : '（2026）评字第 ' + esc(c.no) + ' 号 · '}${esc(c.title)}</p>${v.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('')}<div class="seal"><b>评评理<br>AI 法庭</b></div>`;
 
-    bind('pact').innerHTML = `<h3>📜 寝室公约（AI 起草）</h3><ol>${v.pact.map((p) => `<li>${esc(p)}</li>`).join('')}</ol><a class="btn block" style="margin-top:10px" href="#" id="copy-pact">复制公约文字</a>`;
+    bind('pact').innerHTML = `<h3>📜 ${v.type === 'advice' ? '三条小建议' : '寝室公约（AI 起草）'}</h3><ol>${v.pact.map((p) => `<li>${esc(p)}</li>`).join('')}</ol><a class="btn block" style="margin-top:10px" href="#" id="copy-pact">复制公约文字</a>`;
     $('#copy-pact').addEventListener('click', async (e) => {
       e.preventDefault();
       const text = `📜 ${c.title} · 寝室公约\n` + v.pact.map((p, i) => `${i + 1}. ${p}`).join('\n');
       try { await navigator.clipboard.writeText(text); e.target.textContent = '✅ 已复制，可以发到寝室群'; } catch (_) { prompt('复制下面这段：', text); }
     });
 
+    if (v.type === 'advice') {
+      bind('reconcile').innerHTML = `<h3>💬 可以直接发给室友的话</h3><p class="quote">${esc(v.script || '')}</p><a class="btn primary block" style="margin-top:8px" href="#" id="copy-script">复制这段话</a><p class="hint">本案只听到一方说法，所以只给建议，不判对错。室友想说说自己的想法，可以随时来补充。</p>`;
+      $('#copy-script').addEventListener('click', async (e) => { e.preventDefault(); try { await navigator.clipboard.writeText(v.script || ''); e.target.textContent = '✅ 已复制'; } catch (_) { prompt('复制下面这段：', v.script || ''); } });
+    }
     function renderReconcile(r) {
       const row = (k) => `<div class="stat"><span><span class="who ${k}">${k}</span> ${r[k] ? '已确认' : '等待确认'}</span><span>${r[k] ? '🤝' : '⏳'}</span></div>`;
       const both = r.A && r.B;
@@ -348,7 +360,7 @@
       const a = $('#shake'); if (a) a.addEventListener('click', go(c.viewer && c.viewer.isRespondent ? {} : { who: 'A', demo: true }));
       const b = $('#sim-shake'); if (b) b.addEventListener('click', go({ who: r.A ? 'B' : 'A', demo: true }));
     }
-    renderReconcile(c.reconciled);
+    if (v.type !== 'advice') renderReconcile(c.reconciled);
 
     const rv = bind('juror-review');
     rv.innerHTML = `<h3>🏅 AI 陪审员点评</h3><p class="muted">AI 按“讲理、有建设性、友善”给每位陪审员的意见打分，计入陪审信用。</p>` +
