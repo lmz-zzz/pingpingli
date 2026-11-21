@@ -66,6 +66,8 @@ EOF
 fi
 
 echo "== 4/5 设置开机自启的服务 =="
+CAP=""
+if [ "$PORT" -lt 1024 ]; then CAP="AmbientCapabilities=CAP_NET_BIND_SERVICE"; fi
 sudo tee /etc/systemd/system/pingpingli.service >/dev/null <<EOF
 [Unit]
 Description=pingpingli
@@ -77,6 +79,7 @@ EnvironmentFile=$APP_DIR/.env
 ExecStart=$(command -v node) server.js
 Restart=always
 User=$(whoami)
+$CAP
 
 [Install]
 WantedBy=multi-user.target
