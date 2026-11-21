@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>评评理 · 贡献卷宗</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- 页面 2：AI 贡献卷宗（主角页）
+     后端：GET /api/cases/:id 返回 dossier（AI 生成的 JSON），填 summary / timeline / persons -->
+<header class="topbar"><div class="inner">
+  <a class="logo" href="index.html">评评<span>理</span></a>
+  <nav class="nav">
+    <a href="index.html">判例广场</a>
+    <a href="file.html">我要立案</a>
+    <a href="hall.html">陪审大厅</a>
+    <a class="on" href="me.html">我的</a>
+  </nav>
+</div></header>
+
+<main class="page">
+  <div class="steps"><div class="done">立案</div><div class="done">应诉</div><div class="on">卷宗</div><div>陪审</div><div>判决</div></div>
+
+  <section class="card">
+    <div class="row"><span class="tag">案号 2026 评字第 0042 号</span><span class="tag">传播学概论 · 期中展示</span></div>
+    <h1 style="margin-top:8px">贡献卷宗</h1>
+    <p class="muted">由 AI 书记员根据群聊记录和文档修改记录整理，所有人名已匿名。</p>
+    <p data-bind="summary">本组三人于 11 月 2 日分工：A 负责文献综述，B 负责数据和图表，C 负责 PPT。A、B 均在 11 月 7 日前完成；C 被催促 2 次，于展示前一晚 1:47 回复“在调字体”，文档中共有 3 处修改。</p>
+  </section>
+
+  <h2>每个人做了什么</h2>
+  <section class="person" data-bind="persons" style="margin-bottom:16px">
+    <div class="card">
+      <div class="row"><span class="who A">A</span><b>文献综述</b></div>
+      <div class="stat"><span>承诺</span><span>文献综述</span></div>
+      <div class="stat"><span>实际完成</span><span>综述 + 发起分工</span></div>
+      <div class="stat"><span>被催次数</span><span>0</span></div>
+      <div class="stat"><span>文档修改</span><span>32 处</span></div>
+      <p class="quote">“大家分一下工吧，我做文献综述”</p>
+    </div>
+    <div class="card">
+      <div class="row"><span class="who B">B</span><b>数据和图表</b></div>
+      <div class="stat"><span>承诺</span><span>数据和图表</span></div>
+      <div class="stat"><span>实际完成</span><span>4 张图表</span></div>
+      <div class="stat"><span>被催次数</span><span>0</span></div>
+      <div class="stat"><span>文档修改</span><span>18 处</span></div>
+      <p class="quote">“我来做数据和图表”</p>
+    </div>
+    <div class="card">
+      <div class="row"><span class="who C">C</span><b>PPT</b></div>
+      <div class="stat"><span>承诺</span><span>PPT</span></div>
+      <div class="stat"><span>实际完成</span><span>调整字体（存疑）</span></div>
+      <div class="stat"><span>被催次数</span><span style="color:var(--accent)">2</span></div>
+      <div class="stat"><span>文档修改</span><span>3 处</span></div>
+      <p class="quote">“在弄了在弄了，在调字体”</p>
+    </div>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>时间线</h2>
+      <ul class="timeline" data-bind="timeline">
+        <li><time>11-02 21:14</time>A 发起分工，认领文献综述</li>
+        <li><time>11-02 23:05</time>C 认领 PPT</li>
+        <li><time>11-05</time>A 编辑文档 32 处</li>
+        <li class="warn"><time>11-06 22:31</time>A 第 1 次催促 C</li>
+        <li><time>11-07</time>B 插入 4 张图表</li>
+        <li class="warn"><time>11-08 20:12</time>A 第 2 次催促 C</li>
+        <li class="warn"><time>11-09 01:47</time>C 首次回复：“在调字体”</li>
+      </ul>
+    </section>
+    <aside>
+      <div class="card">
+        <h3>双方说法</h3>
+        <p><b>A：</b>我和 B 做了大部分工作，不想和 C 平分。</p>
+        <p><b>C：</b><span class="muted">（C 补充的说法会显示在这里）</span></p>
+      </div>
+      <a class="btn primary block" href="jury.html">提交给陪审团</a>
+      <p class="hint">系统会随机邀请 7 位不认识你们的同学。</p>
+    </aside>
+  </div>
+</main>
+
+<nav class="tabbar">
+  <a href="index.html"><b>🏛</b>广场</a>
+  <a href="file.html"><b>📝</b>立案</a>
+  <a href="hall.html"><b>⚖️</b>陪审</a>
+  <a class="on" href="me.html"><b>📂</b>我的</a>
+</nav>
+<script src="app.js"></script>
+</body>
+</html>

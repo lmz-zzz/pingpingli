@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>评评理 · 判例广场</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- 页面 0：判例广场（社区首页）
+     后端填：陪审邀请条、判例列表（data-bind="feed"），每张卡片来自已公开的匿名判决 -->
+<header class="topbar"><div class="inner">
+  <a class="logo" href="index.html">评评<span>理</span></a>
+  <nav class="nav">
+    <a class="on" href="index.html">判例广场</a>
+    <a href="file.html">我要立案</a>
+    <a href="hall.html">陪审大厅</a>
+    <a href="me.html">我的</a>
+  </nav>
+</div></header>
+
+<main class="page">
+  <section class="hero">
+    <h1>小组作业交完了，谁干了多少活？</h1>
+    <p>AI 帮你把证据理清楚，7 位陌生同学帮你评个公道。</p>
+    <a class="btn primary" href="file.html">我要立案</a>
+  </section>
+
+  <a class="invite row" href="jury.html" data-bind="invite">
+    <b>⚖️ 你被抽中担任陪审员</b>
+    <span class="muted">案件：《传播学概论》期中展示组 · 还剩 23 小时</span>
+    <span class="spacer"></span><span>去陪审 →</span>
+  </a>
+
+  <div class="grid2">
+    <section class="feed" data-bind="feed">
+      <div class="filters">
+        <a class="on" href="#">最新</a><a href="#">最热</a><a href="#">最离谱</a><a href="#">本院</a>
+      </div>
+
+      <a class="card" href="verdict.html" style="display:block">
+        <div class="row"><span class="tag">传播学概论 · 3 人组</span><span class="spacer"></span><span class="muted">2 小时前</span></div>
+        <h3>“我在调字体”：C 同学的三天</h3>
+        <div class="ratio" style="margin:8px 0">
+          <span class="A" style="width:42%">A 42%</span><span class="B" style="width:40%">B 40%</span><span class="C" style="width:18%">C 18%</span>
+        </div>
+        <p class="quote">陪审员 5 号：调字体也算工作量，但调三天就不算了。</p>
+        <div class="actions"><span>👀 1.2k 围观</span><span>🔨 同判 318</span><span>💬 46</span></div>
+      </a>
+
+      <a class="card" href="verdict.html" style="display:block">
+        <div class="row"><span class="tag">数据结构 · 3 人组</span><span class="spacer"></span><span class="muted">昨天</span></div>
+        <h3>凌晨三点交作业的人，和凌晨三点才回消息的人</h3>
+        <div class="ratio" style="margin:8px 0">
+          <span class="A" style="width:55%">A 55%</span><span class="B" style="width:30%">B 30%</span><span class="C" style="width:15%">C 15%</span>
+        </div>
+        <p class="quote">陪审员 2 号：被 @ 了 11 次才出现，这已经不是划水，是潜水。</p>
+        <div class="actions"><span>👀 860 围观</span><span>🔨 同判 201</span><span>💬 33</span></div>
+      </a>
+
+      <a class="card" href="verdict.html" style="display:block">
+        <div class="row"><span class="tag">社会学研究方法 · 3 人组</span><span class="spacer"></span><span class="muted">3 天前</span></div>
+        <h3>反转：被告其实一个人做完了全部问卷</h3>
+        <div class="ratio" style="margin:8px 0">
+          <span class="A" style="width:28%">A 28%</span><span class="B" style="width:47%">B 47%</span><span class="C" style="width:25%">C 25%</span>
+        </div>
+        <p class="quote">陪审员 7 号：不说话的人未必没干活，卷宗里都写着。</p>
+        <div class="actions"><span>👀 2.4k 围观</span><span>🔨 同判 590</span><span>💬 88</span></div>
+      </a>
+    </section>
+
+    <aside>
+      <div class="card">
+        <h3>判例广场是什么</h3>
+        <p class="muted">双方都同意公开后，判决才会出现在这里。所有人名都已匿名，只能围观和点“同判”，不能改判。</p>
+      </div>
+      <div class="card">
+        <h3>本周最常见案由</h3>
+        <p>① 只做了 PPT 封面<br>② 消失到 ddl 前一晚<br>③ “我在查资料”</p>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<nav class="tabbar">
+  <a class="on" href="index.html"><b>🏛</b>广场</a>
+  <a href="file.html"><b>📝</b>立案</a>
+  <a href="hall.html"><b>⚖️</b>陪审</a>
+  <a href="me.html"><b>📂</b>我的</a>
+</nav>
+<script src="app.js"></script>
+</body>
+</html>

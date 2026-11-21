@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>评评理 · 陪审大厅</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- 页面：陪审大厅（我作为陪审员）
+     后端：GET /api/me/invites 返回待陪审的案子；GET /api/me/jury-history 返回陪审记录 -->
+<header class="topbar"><div class="inner">
+  <a class="logo" href="index.html">评评<span>理</span></a>
+  <nav class="nav">
+    <a href="index.html">判例广场</a>
+    <a href="file.html">我要立案</a>
+    <a class="on" href="hall.html">陪审大厅</a>
+    <a href="me.html">我的</a>
+  </nav>
+</div></header>
+
+<main class="page">
+  <div class="grid2">
+    <section>
+      <div class="card">
+        <h1>陪审大厅</h1>
+        <p class="muted">系统从注册同学里随机抽 7 位不认识当事人的同学。你被抽中时，案子会出现在这里。</p>
+
+        <h3 style="margin-top:12px">待我陪审 <span class="badge red">1</span></h3>
+        <div data-bind="invites">
+          <a class="list-item" href="jury.html">
+            <span class="avatar">⚖️</span>
+            <span class="main"><b>《传播学概论》期中展示 · 3 人组</b><span class="muted">你是第 7 号陪审员 · 已有 6 人投票 · 还剩 23 小时</span></span>
+            <span class="btn primary">去陪审</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>我陪审过的案子</h3>
+        <div data-bind="jury-history">
+          <a class="list-item" href="verdict.html">
+            <span class="main"><b>《数据结构》大作业 · 3 人组</b><span class="muted">我投的：A 50 / B 30 / C 20 · 最终判决：A 55 / B 30 / C 15</span></span>
+            <span class="badge green">和判决接近</span>
+          </a>
+          <a class="list-item" href="verdict.html">
+            <span class="main"><b>《社会学研究方法》问卷调查 · 3 人组</b><span class="muted">我投的：A 30 / B 40 / C 30 · 最终判决：A 28 / B 47 / C 25</span></span>
+            <span class="badge">已结案</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <div class="card">
+        <h3>我的陪审员档案</h3>
+        <div class="stats3" style="margin:8px 0" data-bind="juror-stats">
+          <div><b>5</b><span class="muted">陪审次数</span></div>
+          <div><b>80%</b><span class="muted">和判决接近</span></div>
+          <div><b>12</b><span class="muted">意见被点赞</span></div>
+        </div>
+      </div>
+      <div class="card switch">
+        <div><b>接受陪审邀请</b><p class="muted">关掉后不会再被抽中</p></div>
+        <span class="toggle"></span>
+      </div>
+      <div class="card">
+        <h3>陪审员须知</h3>
+        <p class="muted">① 你看不到当事人真名，当事人也不知道你是谁<br>② 投票前看不到别人的票<br>③ 如果认出了当事人，请点“回避”</p>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<nav class="tabbar">
+  <a href="index.html"><b>🏛</b>广场</a>
+  <a href="file.html"><b>📝</b>立案</a>
+  <a class="on" href="hall.html"><b>⚖️</b>陪审</a>
+  <a href="me.html"><b>📂</b>我的</a>
+</nav>
+<script src="app.js"></script>
+</body>
+</html>

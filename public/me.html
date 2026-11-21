@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>评评理 · 我的</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- 页面：我的（我作为当事人）
+     后端：GET /api/me 返回 { user, cases（我立的/我被告的）, respondInvites（等我应诉的） } -->
+<header class="topbar"><div class="inner">
+  <a class="logo" href="index.html">评评<span>理</span></a>
+  <nav class="nav">
+    <a href="index.html">判例广场</a>
+    <a href="file.html">我要立案</a>
+    <a href="hall.html">陪审大厅</a>
+    <a class="on" href="me.html">我的</a>
+  </nav>
+</div></header>
+
+<main class="page">
+  <div class="grid2">
+    <section>
+      <div class="card">
+        <h3>等我应诉 <span class="badge red">1</span></h3>
+        <div data-bind="respond-invites">
+          <div class="list-item">
+            <span class="main"><b>《线性代数》小组报告</b><span class="muted">你的组员申请评评理。卷宗不会出现真名。</span></span>
+            <a class="btn" href="#">看看</a>
+            <a class="btn primary" href="dossier.html">同意开庭</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>我的案子</h3>
+        <div data-bind="my-cases">
+          <a class="list-item" href="dossier.html">
+            <span class="main"><b>《传播学概论》期中展示</b><span class="muted">我是原告 A · 陪审 6 / 7</span></span>
+            <span class="badge blue">陪审中</span>
+          </a>
+          <a class="list-item" href="file.html">
+            <span class="main"><b>《宏观经济学》案例分析</b><span class="muted">我是原告 A · 等 1 位组员同意</span></span>
+            <span class="badge">待应诉</span>
+          </a>
+          <a class="list-item" href="verdict.html">
+            <span class="main"><b>《大学英语》辩论赛</b><span class="muted">我是被告 B · 判决：A 35 / B 40 / C 25</span></span>
+            <span class="badge green">已判决</span>
+          </a>
+        </div>
+        <a class="btn primary block" style="margin-top:12px" href="file.html">＋ 立新案</a>
+      </div>
+    </section>
+
+    <aside>
+      <div class="card">
+        <div class="row"><span class="avatar lg">不</span><div><b>不想平分的人</b><p class="muted">新闻学院 · 2023 级 · 已验证</p></div></div>
+        <div class="stats3" style="margin-top:12px">
+          <div><b>3</b><span class="muted">我的案子</span></div>
+          <div><b>5</b><span class="muted">陪审次数</span></div>
+          <div><b>1</b><span class="muted">公开判例</span></div>
+        </div>
+        <a class="btn block" style="margin-top:12px" href="hall.html">去陪审大厅 →</a>
+      </div>
+      <div class="card">
+        <h3>设置</h3>
+        <div class="stat"><span>接受陪审邀请</span><span>开</span></div>
+        <div class="stat"><span>判决公开到广场</span><span>每次询问</span></div>
+        <div class="stat"><a href="login.html">退出登录</a><span></span></div>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<nav class="tabbar">
+  <a href="index.html"><b>🏛</b>广场</a>
+  <a href="file.html"><b>📝</b>立案</a>
+  <a href="hall.html"><b>⚖️</b>陪审</a>
+  <a class="on" href="me.html"><b>📂</b>我的</a>
+</nav>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>评评理 · 判决书</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- 页面 4：判决书（也是判例广场点进来的详情页）
+     后端：case.verdict = { ratio:{A,B,C}, text, highlights[] }，由 AI 根据卷宗 + 7 票生成 -->
+<header class="topbar"><div class="inner">
+  <a class="logo" href="index.html">评评<span>理</span></a>
+  <nav class="nav">
+    <a href="index.html">判例广场</a>
+    <a href="file.html">我要立案</a>
+    <a href="hall.html">陪审大厅</a>
+    <a class="on" href="me.html">我的</a>
+  </nav>
+</div></header>
+
+<main class="page">
+  <div class="steps"><div class="done">立案</div><div class="done">应诉</div><div class="done">卷宗</div><div class="done">陪审</div><div class="on">判决</div></div>
+
+  <div class="grid2">
+    <section>
+      <div class="card">
+        <h2>建议贡献比例</h2>
+        <div class="ratio" data-bind="ratio" style="height:40px;font-size:14px">
+          <span class="A" style="width:42%">A 42%</span><span class="B" style="width:40%">B 40%</span><span class="C" style="width:18%">C 18%</span>
+        </div>
+        <p class="hint">综合 7 位陪审员的投票（中位数）和卷宗证据得出。</p>
+        <div class="row" style="margin-top:8px">
+          <a class="btn primary" href="#">复制比例，填老师的表</a>
+          <a class="btn" href="#">生成分享图</a>
+        </div>
+      </div>
+
+      <article class="card verdict" data-bind="verdict-text">
+        <h1>民 事 判 决 书</h1>
+        <p class="no">（2026）评字第 0042 号 · 传播学概论期中展示贡献纠纷案</p>
+        <p>原告 A 诉称，其与 B 承担了本组大部分工作，不愿与 C 平分贡献。被告 C 辩称，自己“一直在弄”。</p>
+        <p>本院查明：C 于 11 月 2 日主动认领 PPT，此后七日内于群聊中无一言、于文档中无一改，经 A 两次 @ 催促，方于展示前夜凌晨一点四十七分现身，自述“在调字体”。本院认为，调整字体确属 PPT 制作之组成部分，但以三日之功仅成三处修改，难谓尽职。</p>
+        <p>另查明，B 全程未被催促，按时交付图表四张，本院予以表扬。</p>
+        <p>综上，参考陪审团七人之意见，判决如下：本组贡献比例建议为 A 42%、B 40%、C 18%。C 同学下次认领任务时，请先确认自己知道 PPT 在哪。</p>
+        <p>如不服本判决，可于三日内提出上诉。</p>
+        <div class="seal"><b>评评理<br>AI 法庭</b></div>
+      </article>
+    </section>
+
+    <aside>
+      <div class="card" data-bind="jury-comments">
+        <h3>陪审团意见</h3>
+        <p class="quote">5 号：调字体也算工作量，但调三天就不算了。</p>
+        <p class="quote">2 号：A 发起分工还写综述，多给一点。</p>
+        <p class="quote">7 号：C 至少做了，别给太低。</p>
+        <a class="muted" href="#">查看全部 7 条 →</a>
+      </div>
+      <div class="card">
+        <h3>接下来</h3>
+        <a class="btn block" href="#" style="margin-bottom:8px">公开到判例广场（需双方同意）</a>
+        <a class="btn block" href="#">不服，上诉</a>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<nav class="tabbar">
+  <a href="index.html"><b>🏛</b>广场</a>
+  <a href="file.html"><b>📝</b>立案</a>
+  <a href="hall.html"><b>⚖️</b>陪审</a>
+  <a class="on" href="me.html"><b>📂</b>我的</a>
+</nav>
+<script src="app.js"></script>
+</body>
+</html>
