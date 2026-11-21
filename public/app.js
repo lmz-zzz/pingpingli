@@ -175,6 +175,13 @@
       return;
     }
 
+    // 演示默认值：值日表案
+    if (form.title && form.claimA) {
+      const r = form.querySelector('input[name=category][value="卫生"]'); if (r) r.checked = true;
+      form.title.value = '值日表上的隐形人';
+      form.claimA.value = '四人宿舍，我每次都按值日表扫地拖地，可小B 轮到他的那天总是“刚好有事”，地一直是我在扫。我不想吵架，就想知道这样公平吗？';
+      if (form.chat) form.chat.value = '[20:12] A：今天又是我拖的地……\n[20:15] B：抱歉抱歉，今天实验室走不开\n[20:16] A：（已读）';
+    }
     status.innerHTML = '<h3>室友应诉</h3><p class="muted">提交后这里会出现邀请链接，发给室友，Ta 同意并写下说法，案子就开庭。</p>';
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
